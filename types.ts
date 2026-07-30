@@ -27,6 +27,9 @@ export interface FilterState {
 export interface MindSheetProps {
   columns: ColumnDef[];
   records: Row[];
+  /* Unfiltered total, for the "показано X из N" counter. Falls back to
+     records.length when not provided. */
+  total?: number;
   sort?: SortState;
   filter?: FilterState;
   filterOptions?: Record<string, string[]>;

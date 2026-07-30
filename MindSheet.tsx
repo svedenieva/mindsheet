@@ -37,10 +37,18 @@ function isCentered(column: ColumnDef): boolean {
 }
 
 export default function MindSheet({
-  columns, records, sort, filter, filterOptions, search,
+  columns, records, total, sort, filter, filterOptions, search,
   onSortChange, onFilterChange, onSearchChange, onRowOpen,
 }: MindSheetProps) {
   const filterables = columns.filter((c) => c.filterable);
+  const hasSearch = Boolean(search && search.trim());
+  const isFiltered = Boolean(filter) || hasSearch;
+  const grandTotal = total ?? records.length;
+
+  const resetAll = () => {
+    onFilterChange(undefined);
+    onSearchChange?.('');
+  };
   const gridCols = columns.filter((c) => c.type !== 'long-text');
   const firstKey = gridCols[0]?.key;
   const rowsClickable = Boolean(onRowOpen);
@@ -81,7 +89,16 @@ export default function MindSheet({
             </select>
           </label>
         ))}
-        <span className={styles.count}>{records.length} записей</span>
+        {isFiltered && (
+          <button type="button" className={styles.reset} onClick={resetAll}>
+            Сбросить
+          </button>
+        )}
+        <span className={styles.count}>
+          {isFiltered
+            ? `показано ${records.length} из ${grandTotal}`
+            : `${grandTotal} записей`}
+        </span>
       </div>
 
       <div className={styles.tableScroll}>

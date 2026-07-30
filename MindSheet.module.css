@@ -72,6 +72,23 @@
   color: var(--ink-25);
 }
 
+/* clears the active filter + search in one click; only shown when active */
+.reset {
+  padding: 6px 12px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--ink-45);
+  cursor: pointer;
+}
+
+.reset:hover {
+  color: var(--ink);
+  border-color: var(--sage);
+}
+
 /* the card: rounded, own scroll region, hairline ring + soft shadow
    instead of a plain border */
 .tableScroll {
