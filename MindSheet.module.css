@@ -5,6 +5,12 @@
 
 .sheet {
   font-family: var(--font-sans), system-ui, sans-serif;
+  /* fill the host's available height when it hands us a bounded flex parent;
+     collapses gracefully to content height on an auto-height host */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
 /* tools row — filters, right-aligned above the card, like Fathom's tableTools */
@@ -69,8 +75,9 @@
 /* the card: rounded, own scroll region, hairline ring + soft shadow
    instead of a plain border */
 .tableScroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
-  max-height: calc(100vh - 210px);
   border-radius: var(--radius-lg);
   background: var(--paper-raised);
   box-shadow: var(--shadow-card), var(--ring);
@@ -170,29 +177,82 @@
   cursor: pointer;
 }
 
-/* record + its detail panel travel together */
-.rowGroup {
-  min-width: 0;
+.rowActive {
+  background: light-dark(#f4f2ee, #1b2125);
 }
 
-/* the click-to-open panel with the long free-text fields.
-   Sticky-left so it stays readable while a wide table scrolls sideways. */
-.detailRow {
+/* ── side panel (drawer) ──────────────────────────────────────────────
+   A click on a row opens the long free-text fields in a fixed overlay on
+   the right. Because it's position:fixed and lives OUTSIDE the scrolling
+   table, it can never stretch the grid or leave an empty wash behind. */
+.drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+  background: light-dark(rgba(40, 38, 34, 0.28), rgba(0, 0, 0, 0.5));
+}
+
+.drawer {
+  width: min(460px, 92vw);
+  height: 100%;
+  overflow-y: auto;
+  padding: 0 24px 40px;
+  background: var(--paper-raised);
+  box-shadow: -18px 0 48px -24px rgba(0, 0, 0, 0.45);
+}
+
+.drawerHead {
   position: sticky;
-  left: 0;
-  /* only as wide as the text, so there's no big empty wash to the right */
-  width: min(720px, 100%);
-  padding: 4px 20px 10px 42px;
-  background: var(--wash);
-  border-top: 1px solid var(--rule-soft);
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 0 12px;
+  margin-bottom: 14px;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--rule);
 }
 
-/* single stacked column: every field takes its natural height, so a short
-   field never gets stretched to match a long one (no big empty gaps). */
+.drawerTitle {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.drawerClose {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-45);
+  cursor: pointer;
+}
+
+.drawerClose:hover {
+  color: var(--ink);
+  border-color: var(--sage);
+}
+
+/* single stacked column: every field takes its natural height */
 .detail {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
   margin: 0;
 }
 
@@ -211,10 +271,11 @@
 
 .detailValue {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
   color: var(--ink-70);
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .td {

@@ -21,8 +21,7 @@ function distinct(records: Row[], key: string): string[] {
   return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
 }
 
-// short columns live in the grid; long-text columns move to the
-// click-to-open detail panel, so the table stays narrow and readable.
+// short columns live in the grid; long-text columns open in a side panel.
 function trackFor(column: ColumnDef, isFirst: boolean): string {
   if (isFirst) return '170px';
   if (column.type === 'number') return '80px';
@@ -47,6 +46,9 @@ export default function MindSheet({
 
   const grid = ['22px', ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
+
+  const openRecord = openId ? records.find((r) => r.id === openId) ?? null : null;
+  const openDetails = openRecord ? detailCols.filter((c) => hasValue(openRecord[c.key])) : [];
 
   return (
     <div className={styles.sheet}>
@@ -120,52 +122,67 @@ export default function MindSheet({
             <div className={styles.none}>Ничего не найдено</div>
           ) : (
             records.map((r) => {
-              const rowDetails = detailCols.filter((c) => hasValue(r[c.key]));
-              const canOpen = rowDetails.length > 0;
-              const open = openId === r.id;
+              const canOpen = detailCols.some((c) => hasValue(r[c.key]));
               return (
-                <div key={r.id} className={styles.rowGroup}>
-                  <div
-                    className={cx(styles.row, canOpen && styles.clickable)}
-                    role="row"
-                    onClick={canOpen ? () => setOpenId(open ? null : r.id) : undefined}
-                  >
-                    <div className={styles.caretCell} aria-hidden="true">
-                      {canOpen ? (open ? '▾' : '▸') : ''}
+                <div
+                  key={r.id}
+                  className={cx(styles.row, canOpen && styles.clickable, openId === r.id && styles.rowActive)}
+                  role="row"
+                  onClick={canOpen ? () => setOpenId(r.id) : undefined}
+                >
+                  <div className={styles.caretCell} aria-hidden="true">{canOpen ? '›' : ''}</div>
+                  {gridCols.map((c) => (
+                    <div
+                      key={c.key}
+                      role="cell"
+                      className={cx(
+                        styles.td,
+                        c.key === firstKey && styles.strong,
+                        isCentered(c) && styles.center,
+                      )}
+                    >
+                      {renderCell(r[c.key], c)}
                     </div>
-                    {gridCols.map((c) => (
-                      <div
-                        key={c.key}
-                        role="cell"
-                        className={cx(
-                          styles.td,
-                          c.key === firstKey && styles.strong,
-                          isCentered(c) && styles.center,
-                        )}
-                      >
-                        {renderCell(r[c.key], c)}
-                      </div>
-                    ))}
-                  </div>
-
-                  {open && canOpen && (
-                    <div className={styles.detailRow} role="row">
-                      <dl className={styles.detail}>
-                        {rowDetails.map((c) => (
-                          <div key={c.key} className={styles.detailItem}>
-                            <dt className={styles.detailLabel}>{c.label}</dt>
-                            <dd className={styles.detailValue}>{renderCell(r[c.key], c)}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </div>
-                  )}
+                  ))}
                 </div>
               );
             })
           )}
         </div>
       </div>
+
+      {openRecord && (
+        <div className={styles.drawerBackdrop} onClick={() => setOpenId(null)}>
+          <aside
+            className={styles.drawer}
+            role="dialog"
+            aria-label="Детали записи"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.drawerHead}>
+              <span className={styles.drawerTitle}>
+                {String((firstKey ? openRecord[firstKey] : '') ?? '')}
+              </span>
+              <button
+                type="button"
+                className={styles.drawerClose}
+                onClick={() => setOpenId(null)}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+            <dl className={styles.detail}>
+              {openDetails.map((c) => (
+                <div key={c.key} className={styles.detailItem}>
+                  <dt className={styles.detailLabel}>{c.label}</dt>
+                  <dd className={styles.detailValue}>{renderCell(openRecord[c.key], c)}</dd>
+                </div>
+              ))}
+            </dl>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }
