@@ -7,6 +7,9 @@ export interface ColumnDef {
   type: ColumnType;
   sortable?: boolean;
   filterable?: boolean;
+  /** explicit sort order for select values (e.g. importance), most-first.
+     Values not listed sort after listed ones. */
+  order?: string[];
 }
 
 export interface Row {
@@ -30,6 +33,8 @@ export interface MindSheetProps {
   /* Unfiltered total, for the "показано X из N" counter. Falls back to
      records.length when not provided. */
   total?: number;
+  /** shows skeleton rows on the first load (records empty + loading) */
+  loading?: boolean;
   sort?: SortState;
   /** legacy single filter (one facet at a time) */
   filter?: FilterState;

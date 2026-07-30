@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 import type { ColumnDef, MindSheetProps, Row } from './types';
 import styles from './MindSheet.module.css';
 
@@ -37,7 +37,7 @@ function isCentered(column: ColumnDef): boolean {
 }
 
 export default function MindSheet({
-  columns, records, total, sort, filter, filters, filterOptions, search,
+  columns, records, total, loading, sort, filter, filters, filterOptions, search,
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
 }: MindSheetProps) {
   const filterables = columns.filter((c) => c.filterable);
@@ -148,7 +148,18 @@ export default function MindSheet({
             })}
           </div>
 
-          {records.length === 0 ? (
+          {loading && records.length === 0 ? (
+            Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className={styles.row} aria-hidden="true">
+                <div className={styles.caretCell} />
+                {gridCols.map((c) => (
+                  <div key={c.key} className={cx(styles.td, isCentered(c) && styles.center)}>
+                    <span className={styles.skel} style={{ width: `${50 + ((i * 7 + c.key.length * 5) % 45)}%` }} />
+                  </div>
+                ))}
+              </div>
+            ))
+          ) : records.length === 0 ? (
             <div className={styles.none}>Ничего не найдено</div>
           ) : (
             records.map((r) => (
@@ -180,7 +191,7 @@ export default function MindSheet({
                       isCentered(c) && styles.center,
                     )}
                   >
-                    {renderCell(r[c.key], c)}
+                    {renderCell(r[c.key], c, search)}
                   </div>
                 ))}
               </div>
@@ -192,7 +203,7 @@ export default function MindSheet({
   );
 }
 
-function renderCell(value: Row[string], col: ColumnDef) {
+function renderCell(value: Row[string], col: ColumnDef, query?: string) {
   if (!hasValue(value)) {
     return <span className={styles.empty}>—</span>;
   }
@@ -209,5 +220,28 @@ function renderCell(value: Row[string], col: ColumnDef) {
       </a>
     );
   }
-  return String(value);
+  return highlight(String(value), query);
+}
+
+// Wraps case-insensitive matches of `query` in <mark> so search hits stand out.
+function highlight(text: string, query?: string) {
+  const q = query?.trim().toLowerCase();
+  if (!q) return text;
+  const lower = text.toLowerCase();
+  const out: Array<string | ReactElement> = [];
+  let from = 0;
+  let idx = lower.indexOf(q);
+  let key = 0;
+  while (idx !== -1) {
+    if (idx > from) out.push(text.slice(from, idx));
+    out.push(
+      <mark key={key++} className={styles.mark}>
+        {text.slice(idx, idx + q.length)}
+      </mark>,
+    );
+    from = idx + q.length;
+    idx = lower.indexOf(q, from);
+  }
+  if (from < text.length) out.push(text.slice(from));
+  return out;
 }

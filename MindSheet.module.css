@@ -240,6 +240,35 @@
   color: var(--ink-25);
 }
 
+/* search-match highlight */
+.mark {
+  background: var(--sage-soft);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+/* loading skeleton bar — a soft shimmer while the first page loads */
+.skel {
+  display: inline-block;
+  width: 70%;
+  height: 11px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--rule-soft) 25%,
+    var(--wash) 37%,
+    var(--rule-soft) 63%
+  );
+  background-size: 400% 100%;
+  animation: skel-shimmer 1.4s ease infinite;
+}
+
+@keyframes skel-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
 .none {
   padding: 24px 20px;
   font-size: 13px;
