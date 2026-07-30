@@ -31,11 +31,17 @@ export interface MindSheetProps {
      records.length when not provided. */
   total?: number;
   sort?: SortState;
+  /** legacy single filter (one facet at a time) */
   filter?: FilterState;
+  /** multiple simultaneous filters (column key → value); preferred */
+  filters?: Record<string, string>;
   filterOptions?: Record<string, string[]>;
   search?: string;
   onSortChange: (key: string) => void;
-  onFilterChange: (filter: FilterState | undefined) => void;
+  /** legacy single-filter handler; used when onFiltersChange is absent */
+  onFilterChange?: (filter: FilterState | undefined) => void;
+  /** multi-filter handler; receives the full next map */
+  onFiltersChange?: (filters: Record<string, string>) => void;
   onSearchChange?: (query: string) => void;
   /* When provided, each row becomes clickable and opens on its own page/view.
      The host decides what that means (e.g. router.push(`/product/${id}`)). */

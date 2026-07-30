@@ -37,16 +37,35 @@ function isCentered(column: ColumnDef): boolean {
 }
 
 export default function MindSheet({
-  columns, records, total, sort, filter, filterOptions, search,
-  onSortChange, onFilterChange, onSearchChange, onRowOpen,
+  columns, records, total, sort, filter, filters, filterOptions, search,
+  onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
 }: MindSheetProps) {
   const filterables = columns.filter((c) => c.filterable);
+
+  // One internal model regardless of which API the host uses: a {key: value}
+  // map. The legacy single `filter` folds into it so old hosts keep working.
+  const filterMap: Record<string, string> =
+    filters ?? (filter ? { [filter.key]: filter.value } : {});
+  const multi = Boolean(onFiltersChange);
+
+  const setFilter = (key: string, value: string) => {
+    if (multi) {
+      const next = { ...filterMap };
+      if (value) next[key] = value;
+      else delete next[key];
+      onFiltersChange!(next);
+    } else {
+      onFilterChange?.(value ? { key, value } : undefined);
+    }
+  };
+
   const hasSearch = Boolean(search && search.trim());
-  const isFiltered = Boolean(filter) || hasSearch;
+  const isFiltered = Object.keys(filterMap).length > 0 || hasSearch;
   const grandTotal = total ?? records.length;
 
   const resetAll = () => {
-    onFilterChange(undefined);
+    if (multi) onFiltersChange!({});
+    else onFilterChange?.(undefined);
     onSearchChange?.('');
   };
   const gridCols = columns.filter((c) => c.type !== 'long-text');
@@ -75,12 +94,8 @@ export default function MindSheet({
             <select
               className={styles.select}
               aria-label={`Фильтр ${c.label}`}
-              value={filter?.key === c.key ? filter.value : ''}
-              onChange={(e) =>
-                onFilterChange(
-                  e.target.value ? { key: c.key, value: e.target.value } : undefined,
-                )
-              }
+              value={filterMap[c.key] ?? ''}
+              onChange={(e) => setFilter(c.key, e.target.value)}
             >
               <option value="">Все</option>
               {(filterOptions?.[c.key] ?? distinct(records, c.key)).map((v) => (

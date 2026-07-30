@@ -43,6 +43,27 @@ describe('MindSheet', () => {
     expect(onFilterChange).toHaveBeenCalledWith({ key: 'region', value: 'US' });
   });
 
+  it('calls onFiltersChange with the merged map when multiple filters are used', () => {
+    const onFiltersChange = vi.fn();
+    render(
+      <MindSheet columns={columns} records={records} filters={{ name: 'Alpha' }}
+        onSortChange={() => {}} onFiltersChange={onFiltersChange} />,
+    );
+    // a second facet is added on top of the existing one, not replacing it
+    fireEvent.change(screen.getByLabelText(/Фильтр Регион/), { target: { value: 'US' } });
+    expect(onFiltersChange).toHaveBeenCalledWith({ name: 'Alpha', region: 'US' });
+  });
+
+  it('removes a facet from the map when its select is cleared (multi)', () => {
+    const onFiltersChange = vi.fn();
+    render(
+      <MindSheet columns={columns} records={records} filters={{ region: 'US' }}
+        onSortChange={() => {}} onFiltersChange={onFiltersChange} />,
+    );
+    fireEvent.change(screen.getByLabelText(/Фильтр Регион/), { target: { value: '' } });
+    expect(onFiltersChange).toHaveBeenCalledWith({});
+  });
+
   it('uses filterOptions for select options when provided, even values absent from records', () => {
     render(
       <MindSheet columns={columns} records={records} filterOptions={{ region: ['EU', 'US', 'APAC'] }}
