@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { ColumnDef, MindSheetProps, Row } from './types';
 import styles from './MindSheet.module.css';
@@ -21,9 +20,10 @@ function distinct(records: Row[], key: string): string[] {
   return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
 }
 
-// short columns live in the grid; long-text columns open in a side panel.
+// short columns live in the grid; long-text columns are shown on the record's
+// own page (opened via onRowOpen), so they stay out of the table entirely.
 function trackFor(column: ColumnDef, isFirst: boolean): string {
-  if (isFirst) return '170px';
+  if (isFirst) return '190px';
   if (column.type === 'number') return '80px';
   if (column.type === 'url') return '160px';
   if (column.type === 'select') return '132px';
@@ -35,20 +35,16 @@ function isCentered(column: ColumnDef): boolean {
 }
 
 export default function MindSheet({
-  columns, records, sort, filter, filterOptions, search, onSortChange, onFilterChange, onSearchChange,
+  columns, records, sort, filter, filterOptions, search,
+  onSortChange, onFilterChange, onSearchChange, onRowOpen,
 }: MindSheetProps) {
-  const [openId, setOpenId] = useState<string | null>(null);
-
   const filterables = columns.filter((c) => c.filterable);
   const gridCols = columns.filter((c) => c.type !== 'long-text');
-  const detailCols = columns.filter((c) => c.type === 'long-text');
   const firstKey = gridCols[0]?.key;
+  const rowsClickable = Boolean(onRowOpen);
 
-  const grid = ['22px', ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
+  const grid = [rowsClickable ? '22px' : '0px', ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
-
-  const openRecord = openId ? records.find((r) => r.id === openId) ?? null : null;
-  const openDetails = openRecord ? detailCols.filter((c) => hasValue(openRecord[c.key])) : [];
 
   return (
     <div className={styles.sheet}>
@@ -121,68 +117,43 @@ export default function MindSheet({
           {records.length === 0 ? (
             <div className={styles.none}>Ничего не найдено</div>
           ) : (
-            records.map((r) => {
-              const canOpen = detailCols.some((c) => hasValue(r[c.key]));
-              return (
-                <div
-                  key={r.id}
-                  className={cx(styles.row, canOpen && styles.clickable, openId === r.id && styles.rowActive)}
-                  role="row"
-                  onClick={canOpen ? () => setOpenId(r.id) : undefined}
-                >
-                  <div className={styles.caretCell} aria-hidden="true">{canOpen ? '›' : ''}</div>
-                  {gridCols.map((c) => (
-                    <div
-                      key={c.key}
-                      role="cell"
-                      className={cx(
-                        styles.td,
-                        c.key === firstKey && styles.strong,
-                        isCentered(c) && styles.center,
-                      )}
-                    >
-                      {renderCell(r[c.key], c)}
-                    </div>
-                  ))}
-                </div>
-              );
-            })
+            records.map((r) => (
+              <div
+                key={r.id}
+                className={cx(styles.row, rowsClickable && styles.clickable)}
+                role={rowsClickable ? 'button' : 'row'}
+                tabIndex={rowsClickable ? 0 : undefined}
+                onClick={rowsClickable ? () => onRowOpen!(r) : undefined}
+                onKeyDown={
+                  rowsClickable
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onRowOpen!(r);
+                        }
+                      }
+                    : undefined
+                }
+              >
+                <div className={styles.caretCell} aria-hidden="true">{rowsClickable ? '›' : ''}</div>
+                {gridCols.map((c) => (
+                  <div
+                    key={c.key}
+                    role="cell"
+                    className={cx(
+                      styles.td,
+                      c.key === firstKey && styles.strong,
+                      isCentered(c) && styles.center,
+                    )}
+                  >
+                    {renderCell(r[c.key], c)}
+                  </div>
+                ))}
+              </div>
+            ))
           )}
         </div>
       </div>
-
-      {openRecord && (
-        <div className={styles.drawerBackdrop} onClick={() => setOpenId(null)}>
-          <aside
-            className={styles.drawer}
-            role="dialog"
-            aria-label="Детали записи"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={styles.drawerHead}>
-              <span className={styles.drawerTitle}>
-                {String((firstKey ? openRecord[firstKey] : '') ?? '')}
-              </span>
-              <button
-                type="button"
-                className={styles.drawerClose}
-                onClick={() => setOpenId(null)}
-                aria-label="Закрыть"
-              >
-                ×
-              </button>
-            </div>
-            <dl className={styles.detail}>
-              {openDetails.map((c) => (
-                <div key={c.key} className={styles.detailItem}>
-                  <dt className={styles.detailLabel}>{c.label}</dt>
-                  <dd className={styles.detailValue}>{renderCell(openRecord[c.key], c)}</dd>
-                </div>
-              ))}
-            </dl>
-          </aside>
-        </div>
-      )}
     </div>
   );
 }

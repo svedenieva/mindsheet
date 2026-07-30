@@ -34,4 +34,7 @@ export interface MindSheetProps {
   onSortChange: (key: string) => void;
   onFilterChange: (filter: FilterState | undefined) => void;
   onSearchChange?: (query: string) => void;
+  /* When provided, each row becomes clickable and opens on its own page/view.
+     The host decides what that means (e.g. router.push(`/product/${id}`)). */
+  onRowOpen?: (record: Row) => void;
 }

@@ -53,7 +53,7 @@ describe('MindSheet', () => {
     expect(select).toBeInTheDocument();
   });
 
-  it('moves long-text columns into a click-to-open detail panel', () => {
+  it('keeps long-text columns out of the grid (they open on the record page)', () => {
     const cols: ColumnDef[] = [
       { key: 'name', label: 'Название', type: 'text' },
       { key: 'bio', label: 'Описание', type: 'long-text' },
@@ -63,12 +63,26 @@ describe('MindSheet', () => {
       <MindSheet columns={cols} records={rows}
         onSortChange={() => {}} onFilterChange={() => {}} />,
     );
-    // the long-text column is not a grid header, and its value is hidden…
+    // the long-text column is neither a grid header nor rendered in the table
     expect(screen.queryByRole('columnheader', { name: /Описание/ })).toBeNull();
     expect(screen.queryByText('Длинный текст про Alpha')).toBeNull();
-    // …until the row is clicked
+  });
+
+  it('calls onRowOpen with the record when a row is clicked', () => {
+    const onRowOpen = vi.fn();
+    render(
+      <MindSheet columns={columns} records={records}
+        onSortChange={() => {}} onFilterChange={() => {}} onRowOpen={onRowOpen} />,
+    );
     fireEvent.click(screen.getByText('Alpha'));
-    expect(screen.getByText('Длинный текст про Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Описание')).toBeInTheDocument();
+    expect(onRowOpen).toHaveBeenCalledWith(records[0]);
+  });
+
+  it('does not make rows clickable without onRowOpen', () => {
+    render(
+      <MindSheet columns={columns} records={records}
+        onSortChange={() => {}} onFilterChange={() => {}} />,
+    );
+    expect(screen.queryByRole('button', { name: /Alpha/ })).toBeNull();
   });
 });
