@@ -180,7 +180,9 @@
 .detailRow {
   position: sticky;
   left: 0;
-  padding: 6px 20px 18px 42px;
+  /* only as wide as the text, so there's no big empty wash to the right */
+  width: min(720px, 100%);
+  padding: 4px 20px 10px 42px;
   background: var(--wash);
   border-top: 1px solid var(--rule-soft);
 }
@@ -190,8 +192,7 @@
 .detail {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-width: 860px;
+  gap: 8px;
   margin: 0;
 }
 
