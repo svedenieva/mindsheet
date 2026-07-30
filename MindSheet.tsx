@@ -22,12 +22,14 @@ function distinct(records: Row[], key: string): string[] {
 
 // short columns live in the grid; long-text columns are shown on the record's
 // own page (opened via onRowOpen), so they stay out of the table entirely.
+// Tracks are fluid (fr, min 0) so the whole grid always fits the page width —
+// no horizontal scrolling — and cell text wraps instead of overflowing.
 function trackFor(column: ColumnDef, isFirst: boolean): string {
-  if (isFirst) return '190px';
-  if (column.type === 'number') return '80px';
-  if (column.type === 'url') return '160px';
-  if (column.type === 'select') return '132px';
-  return '160px'; // text
+  if (isFirst) return 'minmax(0, 1.7fr)';
+  if (column.type === 'number') return 'minmax(0, 0.6fr)';
+  if (column.type === 'url') return 'minmax(0, 1.4fr)';
+  if (column.type === 'select') return 'minmax(0, 1fr)';
+  return 'minmax(0, 1.1fr)'; // text
 }
 
 function isCentered(column: ColumnDef): boolean {
