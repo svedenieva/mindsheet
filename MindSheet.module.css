@@ -175,17 +175,23 @@
   min-width: 0;
 }
 
-/* the click-to-open panel with the long free-text fields, full width */
+/* the click-to-open panel with the long free-text fields.
+   Sticky-left so it stays readable while a wide table scrolls sideways. */
 .detailRow {
-  padding: 4px 20px 16px 42px;
+  position: sticky;
+  left: 0;
+  padding: 6px 20px 18px 42px;
   background: var(--wash);
   border-top: 1px solid var(--rule-soft);
 }
 
+/* single stacked column: every field takes its natural height, so a short
+   field never gets stretched to match a long one (no big empty gaps). */
 .detail {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 12px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 860px;
   margin: 0;
 }
 
