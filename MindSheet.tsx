@@ -220,6 +220,14 @@ function renderCell(value: Row[string], col: ColumnDef, query?: string) {
       </a>
     );
   }
+  if (col.badge) {
+    const variant = col.badgeVariant?.[String(value)] ?? 'grey';
+    return (
+      <span className={cx(styles.badge, styles[`badge_${variant}`])}>
+        {String(value)}
+      </span>
+    );
+  }
   return highlight(String(value), query);
 }
 

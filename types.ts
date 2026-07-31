@@ -10,6 +10,11 @@ export interface ColumnDef {
   /** explicit sort order for select values (e.g. importance), most-first.
      Values not listed sort after listed ones. */
   order?: string[];
+  /** render select values as coloured pills */
+  badge?: boolean;
+  /** value → colour variant (green|teal|blue|amber|red|purple|grey);
+     unmapped values fall back to grey */
+  badgeVariant?: Record<string, string>;
 }
 
 export interface Row {
