@@ -89,6 +89,96 @@
   border-color: var(--sage);
 }
 
+/* ── left-sidebar layout (filtersPosition="left", Fathom-style) ───────── */
+.withSidebar {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* the table area fills the rest and keeps its own scroll */
+.withSidebar > .tableScroll {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sidebar {
+  flex: none;
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+}
+
+.sideHead {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-25);
+  margin-top: 2px;
+}
+
+.sideFilter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sideFilterLabel {
+  font-size: 12px;
+  color: var(--ink-45);
+}
+
+/* in the sidebar, search / selects / count go full-width and stack */
+.sidebar .search {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.sidebar .select {
+  width: 100%;
+}
+
+.sidebar .count {
+  margin: 4px 0 0;
+}
+
+.sidebar .reset {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* narrow screens: sidebar collapses to the top */
+@media (max-width: 760px) {
+  .withSidebar {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sidebar {
+    position: static;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .sidebar .search {
+    flex: 1 1 160px;
+  }
+
+  .sidebar .sideHead {
+    display: none;
+  }
+}
+
 /* the card: rounded, own scroll region, hairline ring + soft shadow
    instead of a plain border */
 .tableScroll {

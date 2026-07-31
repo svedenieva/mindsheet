@@ -37,10 +37,12 @@ function isCentered(column: ColumnDef): boolean {
 }
 
 export default function MindSheet({
-  columns, records, total, loading, sort, filter, filters, filterOptions, search,
+  columns, records, total, loading, filtersPosition = 'top',
+  sort, filter, filters, filterOptions, search,
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
 }: MindSheetProps) {
   const filterables = columns.filter((c) => c.filterable);
+  const sidebar = filtersPosition === 'left';
 
   // One internal model regardless of which API the host uses: a {key: value}
   // map. The legacy single `filter` folds into it so old hosts keep working.
@@ -80,49 +82,49 @@ export default function MindSheet({
   const grid = [rowsClickable ? '22px' : '0px', ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
 
-  return (
-    <div className={styles.sheet}>
-      <div className={styles.tableTools}>
-        {onSearchChange && (
-          <input
-            type="search"
-            className={styles.search}
-            aria-label="Поиск"
-            placeholder="Поиск…"
-            value={search ?? ''}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-        )}
-        {filterables.map((c) => (
-          <label key={c.key} className={styles.filter}>
-            {c.label}:
-            <select
-              className={styles.select}
-              aria-label={`Фильтр ${c.label}`}
-              value={filterMap[c.key] ?? ''}
-              onChange={(e) => setFilter(c.key, e.target.value)}
-            >
-              <option value="">Все</option>
-              {(filterOptions?.[c.key] ?? distinct(records, c.key)).map((v) => (
-                <option key={v} value={v}>{v}</option>
-              ))}
-            </select>
-          </label>
-        ))}
-        {isFiltered && (
-          <button type="button" className={styles.reset} onClick={resetAll}>
-            Сбросить
-          </button>
-        )}
-        <span className={styles.count}>
-          {isFiltered
-            ? `показано ${records.length} из ${grandTotal}`
-            : `${grandTotal} записей`}
-        </span>
-      </div>
+  const searchEl = onSearchChange && (
+    <input
+      type="search"
+      className={styles.search}
+      aria-label="Поиск"
+      placeholder="Поиск…"
+      value={search ?? ''}
+      onChange={(e) => onSearchChange(e.target.value)}
+    />
+  );
 
-      <div className={styles.tableScroll}>
-        <div className={styles.table} style={gridStyle} role="table">
+  const filterEls = filterables.map((c) => (
+    <label key={c.key} className={sidebar ? styles.sideFilter : styles.filter}>
+      {sidebar ? <span className={styles.sideFilterLabel}>{c.label}</span> : `${c.label}:`}
+      <select
+        className={styles.select}
+        aria-label={`Фильтр ${c.label}`}
+        value={filterMap[c.key] ?? ''}
+        onChange={(e) => setFilter(c.key, e.target.value)}
+      >
+        <option value="">Все</option>
+        {(filterOptions?.[c.key] ?? distinct(records, c.key)).map((v) => (
+          <option key={v} value={v}>{v}</option>
+        ))}
+      </select>
+    </label>
+  ));
+
+  const resetEl = isFiltered && (
+    <button type="button" className={styles.reset} onClick={resetAll}>
+      Сбросить
+    </button>
+  );
+
+  const countEl = (
+    <span className={styles.count}>
+      {isFiltered ? `показано ${records.length} из ${grandTotal}` : `${grandTotal} записей`}
+    </span>
+  );
+
+  const tableEl = (
+    <div className={styles.tableScroll}>
+      <div className={styles.table} style={gridStyle} role="table">
           <div className={styles.tableHead} role="row">
             <div className={styles.caretCell} aria-hidden="true" />
             {gridCols.map((c) => {
@@ -205,8 +207,36 @@ export default function MindSheet({
               </div>
             ))
           )}
+      </div>
+    </div>
+  );
+
+  if (sidebar) {
+    return (
+      <div className={styles.sheet}>
+        <div className={styles.withSidebar}>
+          <aside className={styles.sidebar}>
+            {searchEl}
+            {filterables.length > 0 && <div className={styles.sideHead}>Фильтры</div>}
+            {filterEls}
+            {resetEl}
+            {countEl}
+          </aside>
+          {tableEl}
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className={styles.sheet}>
+      <div className={styles.tableTools}>
+        {searchEl}
+        {filterEls}
+        {resetEl}
+        {countEl}
+      </div>
+      {tableEl}
     </div>
   );
 }
