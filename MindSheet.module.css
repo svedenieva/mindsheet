@@ -113,9 +113,12 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* natural height, pinned to the top of the row — all filters stay visible
-     at once, the column never scrolls. */
-  align-self: flex-start;
+  /* stretch down to the bottom of the table card so the filter column lines
+     up with the cards. This only sets the column's height — it doesn't touch
+     the table's width/height, so the cards keep their space. Filters sit at
+     the top; on a normal screen they all fit, so the column never scrolls. */
+  align-self: stretch;
+  min-height: 0;
 }
 
 .sideHead {
