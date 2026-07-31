@@ -113,12 +113,9 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* match the table card's height exactly — the filter column ends level
-     with the bottom of the card instead of hanging below it. If the filters
-     are taller than the card (short viewport) the column scrolls on its own. */
-  align-self: stretch;
-  min-height: 0;
-  overflow-y: auto;
+  /* natural height, pinned to the top of the row — all filters stay visible
+     at once, the column never scrolls. */
+  align-self: flex-start;
 }
 
 .sideHead {
