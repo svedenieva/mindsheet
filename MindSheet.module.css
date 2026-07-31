@@ -112,32 +112,34 @@
   width: 210px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  /* tight vertical rhythm so all the filters fit inside the card's height
+     without scrolling */
+  gap: 8px;
   /* stretch down to the bottom of the table card so the filter column lines
      up with the cards. This only sets the column's height — it doesn't touch
      the table's width/height, so the cards keep their space. Filters sit at
-     the top; on a normal screen they all fit, so the column never scrolls. */
+     the top; the compact rhythm keeps them all visible, so it never scrolls. */
   align-self: stretch;
   min-height: 0;
 }
 
 .sideHead {
   font-family: var(--font-mono), monospace;
-  font-size: 10px;
+  font-size: 9.5px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--ink-25);
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .sideFilter {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .sideFilterLabel {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--ink-45);
 }
 
@@ -147,14 +149,16 @@
   width: 100%;
   min-width: 0;
   max-width: none;
+  padding: 6px 11px;
 }
 
 .sidebar .select {
   width: 100%;
+  padding: 4px 9px;
 }
 
 .sidebar .count {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
 }
 
 .sidebar .reset {
