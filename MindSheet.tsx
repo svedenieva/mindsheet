@@ -59,6 +59,11 @@ export default function MindSheet({
     }
   };
 
+  // click a badge to filter by it; click the active one again to clear
+  const toggleFilter = (key: string, value: string) => {
+    setFilter(key, filterMap[key] === value ? '' : value);
+  };
+
   const hasSearch = Boolean(search && search.trim());
   const isFiltered = Object.keys(filterMap).length > 0 || hasSearch;
   const grandTotal = total ?? records.length;
@@ -191,7 +196,10 @@ export default function MindSheet({
                       isCentered(c) && styles.center,
                     )}
                   >
-                    {renderCell(r[c.key], c, search)}
+                    {renderCell(r[c.key], c, search, {
+                      activeValue: filterMap[c.key],
+                      onFilter: toggleFilter,
+                    })}
                   </div>
                 ))}
               </div>
@@ -203,7 +211,12 @@ export default function MindSheet({
   );
 }
 
-function renderCell(value: Row[string], col: ColumnDef, query?: string) {
+interface BadgeCtx {
+  activeValue?: string;
+  onFilter?: (key: string, value: string) => void;
+}
+
+function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: BadgeCtx) {
   if (!hasValue(value)) {
     return <span className={styles.empty}>—</span>;
   }
@@ -222,11 +235,27 @@ function renderCell(value: Row[string], col: ColumnDef, query?: string) {
   }
   if (col.badge) {
     const variant = col.badgeVariant?.[String(value)] ?? 'grey';
-    return (
-      <span className={cx(styles.badge, styles[`badge_${variant}`])}>
-        {String(value)}
-      </span>
-    );
+    const cls = cx(styles.badge, styles[`badge_${variant}`]);
+    // filterable badges become buttons: click to filter, click the active
+    // one again to clear. stopPropagation keeps the row's open-on-click quiet.
+    if (col.filterable && badge?.onFilter) {
+      const active = badge.activeValue === String(value);
+      return (
+        <button
+          type="button"
+          className={cx(cls, styles.badgeBtn, active && styles.badgeActive)}
+          title={active ? 'Убрать фильтр' : `Фильтр: ${String(value)}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            badge.onFilter!(col.key, String(value));
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {String(value)}
+        </button>
+      );
+    }
+    return <span className={cls}>{String(value)}</span>;
   }
   return highlight(String(value), query);
 }

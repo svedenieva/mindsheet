@@ -271,6 +271,27 @@
 .badge_purple { background: light-dark(#efe6f7, #231a2e); color: light-dark(#6b478a, #bd98ec); }
 .badge_grey   { background: var(--wash); color: var(--ink-45); }
 
+/* filterable badge = button: same pill look, clickable */
+.badgeBtn {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 500;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.badgeBtn:hover {
+  filter: brightness(0.96) saturate(1.1);
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+/* the badge whose value is the active filter */
+.badgeActive {
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
 /* loading skeleton bar — a soft shimmer while the first page loads */
 .skel {
   display: inline-block;
