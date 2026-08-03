@@ -58,4 +58,12 @@ export interface MindSheetProps {
   /* When provided, each row becomes clickable and opens on its own page/view.
      The host decides what that means (e.g. router.push(`/product/${id}`)). */
   onRowOpen?: (record: Row) => void;
+
+  /** spreadsheet mode: dense rows, click-to-edit cells, an add-row at the
+     bottom. Opt-in — read-only hosts (e.g. Fathom) leave it off. */
+  editable?: boolean;
+  /** commit an edited cell: (record, columnKey, newValue) */
+  onCellEdit?: (record: Row, key: string, value: string) => void;
+  /** append a new row from the bottom input line (columnKey → value) */
+  onAddRow?: (data: Record<string, string>) => void;
 }

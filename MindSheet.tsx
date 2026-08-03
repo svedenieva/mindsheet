@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties, ReactElement } from 'react';
+import { useState, type CSSProperties, type ReactElement } from 'react';
 import type { ColumnDef, MindSheetProps, Row } from './types';
 import styles from './MindSheet.module.css';
 
@@ -40,9 +40,30 @@ export default function MindSheet({
   columns, records, total, loading, filtersPosition = 'top',
   sort, filter, filters, filterOptions, search,
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
+  editable, onCellEdit, onAddRow,
 }: MindSheetProps) {
   const filterables = columns.filter((c) => c.filterable);
   const sidebar = filtersPosition === 'left';
+
+  // spreadsheet mode: which cell is open, its draft, and the bottom add-row draft
+  const [editing, setEditing] = useState<{ id: string; key: string } | null>(null);
+  const [draft, setDraft] = useState('');
+  const [addDraft, setAddDraft] = useState<Record<string, string>>({});
+
+  const startEdit = (r: Row, key: string) => {
+    setEditing({ id: r.id, key });
+    setDraft(r[key] == null ? '' : String(r[key]));
+  };
+  const commitEdit = (r: Row, key: string) => {
+    setEditing(null);
+    if (onCellEdit && draft !== (r[key] == null ? '' : String(r[key]))) onCellEdit(r, key, draft);
+  };
+  const commitAdd = () => {
+    if (onAddRow && Object.values(addDraft).some((v) => v.trim())) {
+      onAddRow(addDraft);
+      setAddDraft({});
+    }
+  };
 
   // One internal model regardless of which API the host uses: a {key: value}
   // map. The legacy single `filter` folds into it so old hosts keep working.
@@ -79,8 +100,38 @@ export default function MindSheet({
   const firstKey = gridCols[0]?.key;
   const rowsClickable = Boolean(onRowOpen);
 
-  const grid = [rowsClickable ? '22px' : '0px', ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
+  const lead = rowsClickable || editable ? '22px' : '0px';
+  const grid = [lead, ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
+
+  // reusable in-cell editor (used by both edit-in-place and the add-row line)
+  const cellInput = (
+    col: ColumnDef,
+    value: string,
+    onInput: (v: string) => void,
+    opts: {
+      autoFocus?: boolean;
+      placeholder?: string;
+      commitOnBlur?: boolean;
+      onCommit?: () => void;
+      onCancel?: () => void;
+    },
+  ) => (
+    <input
+      className={styles.cellInput}
+      autoFocus={opts.autoFocus}
+      type={col.type === 'number' ? 'number' : 'text'}
+      list={col.type === 'select' ? `dl-${col.key}` : undefined}
+      placeholder={opts.placeholder}
+      value={value}
+      onChange={(e) => onInput(e.target.value)}
+      onBlur={opts.commitOnBlur ? opts.onCommit : undefined}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.preventDefault(); opts.onCommit?.(); }
+        else if (e.key === 'Escape') { e.preventDefault(); opts.onCancel?.(); }
+      }}
+    />
+  );
 
   const searchEl = onSearchChange && (
     <input
@@ -124,7 +175,7 @@ export default function MindSheet({
 
   const tableEl = (
     <div className={styles.tableScroll}>
-      <div className={styles.table} style={gridStyle} role="table">
+      <div className={cx(styles.table, editable && styles.compact)} style={gridStyle} role="table">
           <div className={styles.tableHead} role="row">
             <div className={styles.caretCell} aria-hidden="true" />
             {gridCols.map((c) => {
@@ -188,26 +239,65 @@ export default function MindSheet({
                 }
               >
                 <div className={styles.caretCell} aria-hidden="true">{rowsClickable ? '›' : ''}</div>
-                {gridCols.map((c) => (
-                  <div
-                    key={c.key}
-                    role="cell"
-                    className={cx(
-                      styles.td,
-                      c.key === firstKey && styles.strong,
-                      isCentered(c) && styles.center,
-                    )}
-                  >
-                    {renderCell(r[c.key], c, search, {
-                      activeValue: filterMap[c.key],
-                      onFilter: toggleFilter,
-                    })}
-                  </div>
-                ))}
+                {gridCols.map((c) => {
+                  const editingThis = editable && editing?.id === r.id && editing?.key === c.key;
+                  return (
+                    <div
+                      key={c.key}
+                      role="cell"
+                      className={cx(
+                        styles.td,
+                        c.key === firstKey && styles.strong,
+                        isCentered(c) && styles.center,
+                        editable && styles.editableTd,
+                      )}
+                      onClick={editable && !editingThis ? () => startEdit(r, c.key) : undefined}
+                    >
+                      {editingThis
+                        ? cellInput(c, draft, setDraft, {
+                            autoFocus: true,
+                            commitOnBlur: true,
+                            onCommit: () => commitEdit(r, c.key),
+                            onCancel: () => setEditing(null),
+                          })
+                        : renderCell(r[c.key], c, search, {
+                            activeValue: filterMap[c.key],
+                            onFilter: toggleFilter,
+                          })}
+                    </div>
+                  );
+                })}
               </div>
             ))
           )}
+
+          {editable && !loading && (
+            <div className={cx(styles.row, styles.addRow)} role="row">
+              <div className={styles.caretCell} aria-hidden="true">+</div>
+              {gridCols.map((c) => (
+                <div key={c.key} className={cx(styles.td, isCentered(c) && styles.center)}>
+                  {cellInput(
+                    c,
+                    addDraft[c.key] ?? '',
+                    (v) => setAddDraft((d) => ({ ...d, [c.key]: v })),
+                    { placeholder: c.label, onCommit: commitAdd },
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
       </div>
+
+      {editable &&
+        gridCols
+          .filter((c) => c.type === 'select')
+          .map((c) => (
+            <datalist key={c.key} id={`dl-${c.key}`}>
+              {(filterOptions?.[c.key] ?? distinct(records, c.key)).map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
+          ))}
     </div>
   );
 
