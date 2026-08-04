@@ -480,3 +480,59 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+/* ── auto-grouping on sort (Google-Sheets style +/- rows) ────── */
+.groupRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-top: 1px solid var(--rule);
+  background: light-dark(#f4f2ee, #1b2126);
+  font-size: 12.5px;
+  position: sticky;
+  top: 34px;
+  z-index: 3;
+}
+
+.groupToggle {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--ink-70);
+  cursor: pointer;
+}
+.groupToggle:hover {
+  border-color: var(--sage);
+  color: var(--sage);
+}
+
+.groupLabel {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-25);
+}
+
+.groupValue {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.groupCount {
+  margin-left: auto;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--ink-45);
+}

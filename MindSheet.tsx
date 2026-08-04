@@ -40,10 +40,20 @@ export default function MindSheet({
   columns, records, total, loading, filtersPosition = 'top',
   sort, filter, filters, filterOptions, search,
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
-  editable, onCellEdit, onAddRow,
+  editable, onCellEdit, onAddRow, autoGroup,
 }: MindSheetProps) {
   const filterables = columns.filter((c) => c.filterable);
   const sidebar = filtersPosition === 'left';
+
+  // свёрнутые группы авто-группировки (по значению сортируемой колонки)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleGroup = (value: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
 
   // spreadsheet mode: which cell is open, its draft, and the bottom add-row draft
   const [editing, setEditing] = useState<{ id: string; key: string } | null>(null);
@@ -103,6 +113,22 @@ export default function MindSheet({
   const lead = rowsClickable || editable ? '22px' : '0px';
   const grid = [lead, ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
+
+  // Авто-группировка: строки уже отсортированы хостом, поэтому одинаковые
+  // значения идут подряд — режем на группы одним проходом. Если все значения
+  // разные, группировать нечего (иначе получим заголовок над каждой строкой).
+  const groupKey = autoGroup && sort?.key ? sort.key : null;
+  const groups: Array<{ value: string; rows: Row[] }> = [];
+  if (groupKey) {
+    for (const r of records) {
+      const value = hasValue(r[groupKey]) ? String(r[groupKey]) : '—';
+      const last = groups[groups.length - 1];
+      if (last && last.value === value) last.rows.push(r);
+      else groups.push({ value, rows: [r] });
+    }
+  }
+  const grouped = Boolean(groupKey) && groups.length > 0 && groups.length < records.length;
+  const groupLabel = groupKey ? (columns.find((c) => c.key === groupKey)?.label ?? groupKey) : '';
 
   // reusable in-cell editor (used by both edit-in-place and the add-row line)
   const cellInput = (
@@ -219,56 +245,31 @@ export default function MindSheet({
             ))
           ) : records.length === 0 ? (
             <div className={styles.none}>Ничего не найдено</div>
-          ) : (
-            records.map((r) => (
-              <div
-                key={r.id}
-                className={cx(styles.row, rowsClickable && styles.clickable)}
-                role={rowsClickable ? 'button' : 'row'}
-                tabIndex={rowsClickable ? 0 : undefined}
-                onClick={rowsClickable ? () => onRowOpen!(r) : undefined}
-                onKeyDown={
-                  rowsClickable
-                    ? (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onRowOpen!(r);
-                        }
-                      }
-                    : undefined
-                }
-              >
-                <div className={styles.caretCell} aria-hidden="true">{rowsClickable ? '›' : ''}</div>
-                {gridCols.map((c) => {
-                  const editingThis = editable && editing?.id === r.id && editing?.key === c.key;
-                  return (
-                    <div
-                      key={c.key}
-                      role="cell"
-                      className={cx(
-                        styles.td,
-                        c.key === firstKey && styles.strong,
-                        isCentered(c) && styles.center,
-                        editable && styles.editableTd,
-                      )}
-                      onClick={editable && !editingThis ? () => startEdit(r, c.key) : undefined}
+          ) : grouped ? (
+            groups.map((g) => {
+              const isCollapsed = collapsed.has(g.value);
+              return (
+                <div key={g.value}>
+                  <div className={styles.groupRow} role="row">
+                    <button
+                      type="button"
+                      className={styles.groupToggle}
+                      onClick={() => toggleGroup(g.value)}
+                      aria-expanded={!isCollapsed}
+                      title={isCollapsed ? 'Развернуть' : 'Свернуть'}
                     >
-                      {editingThis
-                        ? cellInput(c, draft, setDraft, {
-                            autoFocus: true,
-                            commitOnBlur: true,
-                            onCommit: () => commitEdit(r, c.key),
-                            onCancel: () => setEditing(null),
-                          })
-                        : renderCell(r[c.key], c, search, {
-                            activeValue: filterMap[c.key],
-                            onFilter: toggleFilter,
-                          })}
-                    </div>
-                  );
-                })}
-              </div>
-            ))
+                      {isCollapsed ? '+' : '−'}
+                    </button>
+                    <span className={styles.groupLabel}>{groupLabel}:</span>
+                    <span className={styles.groupValue}>{g.value}</span>
+                    <span className={styles.groupCount}>{g.rows.length}</span>
+                  </div>
+                  {!isCollapsed && g.rows.map(renderRow)}
+                </div>
+              );
+            })
+          ) : (
+            records.map(renderRow)
           )}
 
           {editable && !loading && (
@@ -300,6 +301,59 @@ export default function MindSheet({
           ))}
     </div>
   );
+
+  // отрисовка одной строки таблицы (плоский и групповой вид)
+  function renderRow(r: Row) {
+    return (
+      <div
+        key={r.id}
+        className={cx(styles.row, rowsClickable && styles.clickable)}
+        role={rowsClickable ? "button" : "row"}
+        tabIndex={rowsClickable ? 0 : undefined}
+        onClick={rowsClickable ? () => onRowOpen!(r) : undefined}
+        onKeyDown={
+          rowsClickable
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onRowOpen!(r);
+                }
+              }
+            : undefined
+        }
+      >
+        <div className={styles.caretCell} aria-hidden="true">{rowsClickable ? "›" : ""}</div>
+        {gridCols.map((c) => {
+          const editingThis = editable && editing?.id === r.id && editing?.key === c.key;
+          return (
+            <div
+              key={c.key}
+              role="cell"
+              className={cx(
+                styles.td,
+                c.key === firstKey && styles.strong,
+                isCentered(c) && styles.center,
+                editable && styles.editableTd,
+              )}
+              onClick={editable && !editingThis ? () => startEdit(r, c.key) : undefined}
+            >
+              {editingThis
+                ? cellInput(c, draft, setDraft, {
+                    autoFocus: true,
+                    commitOnBlur: true,
+                    onCommit: () => commitEdit(r, c.key),
+                    onCancel: () => setEditing(null),
+                  })
+                : renderCell(r[c.key], c, search, {
+                    activeValue: filterMap[c.key],
+                    onFilter: toggleFilter,
+                  })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   if (sidebar) {
     return (

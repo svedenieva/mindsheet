@@ -62,6 +62,10 @@ export interface MindSheetProps {
   /** spreadsheet mode: dense rows, click-to-edit cells, an add-row at the
      bottom. Opt-in — read-only hosts (e.g. Fathom) leave it off. */
   editable?: boolean;
+  /** when sorting is active, rows sharing the sorted value collapse into
+     groups with a +/- toggle (Google-Sheets style). No effect when every
+     value is unique. */
+  autoGroup?: boolean;
   /** commit an edited cell: (record, columnKey, newValue) */
   onCellEdit?: (record: Row, key: string, value: string) => void;
   /** append a new row from the bottom input line (columnKey → value) */
