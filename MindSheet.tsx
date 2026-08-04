@@ -114,21 +114,50 @@ export default function MindSheet({
   const grid = [lead, ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
 
-  // Авто-группировка: строки уже отсортированы хостом, поэтому одинаковые
-  // значения идут подряд — режем на группы одним проходом. Если все значения
-  // разные, группировать нечего (иначе получим заголовок над каждой строкой).
+  // Авто-группировка. Собираем по ЗНАЧЕНИЮ, а не по соседству строк: одно
+  // значение — ровно одна группа, даже если строки идут вразбивку. Порядок
+  // групп — по правилам колонки (явный order, число или текст) и направлению
+  // сортировки; внутри группы строки сортируются по первой колонке.
   const groupKey = autoGroup && sort?.key ? sort.key : null;
+  const groupCol = groupKey ? columns.find((c) => c.key === groupKey) : undefined;
   const groups: Array<{ value: string; rows: Row[] }> = [];
   if (groupKey) {
+    const map = new Map<string, Row[]>();
     for (const r of records) {
-      const value = hasValue(r[groupKey]) ? String(r[groupKey]) : '—';
-      const last = groups[groups.length - 1];
-      if (last && last.value === value) last.rows.push(r);
-      else groups.push({ value, rows: [r] });
+      // нормализуем значение, чтобы «WorkOS» и «workos » попали в одну группу
+      const raw = hasValue(r[groupKey]) ? String(r[groupKey]).trim() : '';
+      const value = raw === '' ? '—' : raw;
+      const bucket = map.get(value);
+      if (bucket) bucket.push(r);
+      else map.set(value, [r]);
     }
+    const dir = sort!.dir === 'desc' ? -1 : 1;
+    const rank = (v: string) => {
+      if (!groupCol?.order) return -1;
+      const i = groupCol.order.indexOf(v);
+      return i === -1 ? groupCol.order.length : i;
+    };
+    const nameKey = gridCols[0]?.key;
+    for (const [value, rows] of map) {
+      if (nameKey) {
+        rows.sort((a, b) =>
+          String(a[nameKey] ?? '').localeCompare(String(b[nameKey] ?? ''), 'ru'),
+        );
+      }
+      groups.push({ value, rows });
+    }
+    groups.sort((a, b) => {
+      // пустые значения всегда в конце
+      if (a.value === '—') return 1;
+      if (b.value === '—') return -1;
+      if (groupCol?.order) return (rank(a.value) - rank(b.value)) * dir;
+      if (groupCol?.type === 'number') return (Number(a.value) - Number(b.value)) * dir;
+      return a.value.localeCompare(b.value, 'ru') * dir;
+    });
   }
   const grouped = Boolean(groupKey) && groups.length > 0 && groups.length < records.length;
-  const groupLabel = groupKey ? (columns.find((c) => c.key === groupKey)?.label ?? groupKey) : '';
+  const groupLabel = groupCol?.label ?? groupKey ?? '';
+  const allCollapsed = grouped && groups.every((g) => collapsed.has(g.value));
 
   // reusable in-cell editor (used by both edit-in-place and the add-row line)
   const cellInput = (
@@ -246,7 +275,22 @@ export default function MindSheet({
           ) : records.length === 0 ? (
             <div className={styles.none}>Ничего не найдено</div>
           ) : grouped ? (
-            groups.map((g) => {
+            <>
+            <div className={styles.groupBar} role="row">
+              <button
+                type="button"
+                className={styles.groupBarBtn}
+                onClick={() =>
+                  setCollapsed(allCollapsed ? new Set() : new Set(groups.map((g) => g.value)))
+                }
+              >
+                {allCollapsed ? 'Развернуть все' : 'Свернуть все'}
+              </button>
+              <span className={styles.groupBarInfo}>
+                группировка: {groupLabel} · {groups.length}
+              </span>
+            </div>
+            {groups.map((g) => {
               const isCollapsed = collapsed.has(g.value);
               return (
                 <div key={g.value}>
@@ -267,7 +311,8 @@ export default function MindSheet({
                   {!isCollapsed && g.rows.map(renderRow)}
                 </div>
               );
-            })
+            })}
+            </>
           ) : (
             records.map(renderRow)
           )}
