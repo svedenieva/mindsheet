@@ -51,8 +51,11 @@ export default function MindSheet({
   columns, records, total, loading, filtersPosition = 'top',
   sort, filter, filters, filterOptions, search,
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
-  editable, onCellEdit, onAddRow, autoGroup, sorts, onSortsChange,
+  editable, onCellEdit, onAddRow, autoGroup, sorts, onSortsChange, onSortReset,
+  favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
 }: MindSheetProps) {
+  const favSet = new Set(favorites ?? []);
+  const canFavorite = Boolean(onToggleFavorite);
   const filterables = columns.filter((c) => c.filterable);
   const sidebar = filtersPosition === 'left';
 
@@ -122,7 +125,8 @@ export default function MindSheet({
   const rowsClickable = Boolean(onRowOpen);
 
   const lead = rowsClickable || editable ? '22px' : '0px';
-  const grid = [lead, ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
+
+  const grid = [lead, ...(canFavorite ? ['24px'] : []), ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
 
   // Авто-группировка по уровням сортировки (до 3). Собираем по ЗНАЧЕНИЮ, а не
@@ -266,6 +270,24 @@ export default function MindSheet({
     </button>
   );
 
+  // «только избранные» + сброс сортировки/группировки
+  const favEl = onFavoritesOnlyChange && (
+    <label className={styles.favOnly}>
+      <input
+        type="checkbox"
+        checked={Boolean(favoritesOnly)}
+        onChange={(e) => onFavoritesOnlyChange(e.target.checked)}
+      />
+      ★ Только избранные
+    </label>
+  );
+
+  const sortResetEl = onSortReset && levels.length > 0 && (
+    <button type="button" className={styles.reset} onClick={onSortReset}>
+      Убрать сортировку
+    </button>
+  );
+
   const countEl = (
     <span className={styles.count}>
       {isFiltered ? `показано ${records.length} из ${grandTotal}` : `${grandTotal} записей`}
@@ -277,6 +299,7 @@ export default function MindSheet({
       <div className={cx(styles.table, editable && styles.compact)} style={gridStyle} role="table">
           <div className={styles.tableHead} role="row">
             <div className={styles.caretCell} aria-hidden="true" />
+            {canFavorite && <div className={styles.caretCell} aria-hidden="true">★</div>}
             {gridCols.map((c) => {
               const levelIdx = levels.findIndex((l) => l.key === c.key);
               const active = levelIdx >= 0;
@@ -318,6 +341,7 @@ export default function MindSheet({
             Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className={styles.row} aria-hidden="true">
                 <div className={styles.caretCell} />
+                {canFavorite && <div className={styles.caretCell} />}
                 {gridCols.map((c) => (
                   <div key={c.key} className={cx(styles.td, isCentered(c) && styles.center)}>
                     <span className={styles.skel} style={{ width: `${50 + ((i * 7 + c.key.length * 5) % 45)}%` }} />
@@ -355,6 +379,7 @@ export default function MindSheet({
           {editable && !loading && (
             <div className={cx(styles.row, styles.addRow)} role="row">
               <div className={styles.caretCell} aria-hidden="true">+</div>
+              {canFavorite && <div className={styles.caretCell} />}
               {gridCols.map((c) => (
                 <div key={c.key} className={cx(styles.td, isCentered(c) && styles.center)}>
                   {cellInput(
@@ -431,6 +456,23 @@ export default function MindSheet({
         }
       >
         <div className={styles.caretCell} aria-hidden="true">{rowsClickable ? "›" : ""}</div>
+        {canFavorite && (
+          <div className={styles.caretCell}>
+            <button
+              type="button"
+              className={cx(styles.star, favSet.has(r.id) && styles.starOn)}
+              title={favSet.has(r.id) ? 'Убрать из избранного' : 'В избранное'}
+              aria-pressed={favSet.has(r.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorite!(r);
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              {favSet.has(r.id) ? '★' : '☆'}
+            </button>
+          </div>
+        )}
         {gridCols.map((c) => {
           const editingThis = editable && editing?.id === r.id && editing?.key === c.key;
           return (
@@ -471,6 +513,8 @@ export default function MindSheet({
             {searchEl}
             {filterables.length > 0 && <div className={styles.sideHead}>Фильтры</div>}
             {filterEls}
+            {favEl}
+            {sortResetEl}
             {resetEl}
             {countEl}
           </aside>
@@ -485,7 +529,9 @@ export default function MindSheet({
       <div className={styles.tableTools}>
         {searchEl}
         {filterEls}
-        {resetEl}
+        {favEl}
+            {sortResetEl}
+            {resetEl}
         {countEl}
       </div>
       {tableEl}

@@ -591,3 +591,29 @@
   margin-left: 1px;
   color: var(--ink-45);
 }
+
+/* favourites */
+.star {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink-25);
+  cursor: pointer;
+}
+.star:hover { color: var(--sage); }
+.starOn { color: #d99a2b; }
+
+.favOnly {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-70);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.favOnly input { accent-color: var(--sage); }

@@ -72,6 +72,16 @@ export interface MindSheetProps {
   /** header click with `additive` (shift/ctrl) appends a sort level instead
      of replacing the primary one */
   onSortsChange?: (key: string, additive: boolean) => void;
+  /** clears sorting (and therefore grouping); shows a reset button */
+  onSortReset?: () => void;
+
+  /** ids of favourited records — shown with a filled star */
+  favorites?: string[];
+  /** star click on a row */
+  onToggleFavorite?: (record: Row) => void;
+  /** when true only favourites are listed (host does the filtering) */
+  favoritesOnly?: boolean;
+  onFavoritesOnlyChange?: (only: boolean) => void;
   /** commit an edited cell: (record, columnKey, newValue) */
   onCellEdit?: (record: Row, key: string, value: string) => void;
   /** append a new row from the bottom input line (columnKey → value) */
