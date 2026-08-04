@@ -567,3 +567,27 @@
   font-size: 10.5px;
   color: var(--ink-25);
 }
+
+/* nesting levels of auto-grouping */
+.groupDepth0 { background: light-dark(#efece6, #1e252b); font-size: 12.5px; }
+.groupDepth1 { background: light-dark(#f4f2ee, #1b2126); font-size: 12px; }
+.groupDepth2 { background: light-dark(#f8f7f4, #191f24); font-size: 11.5px; }
+.groupDepth1 .groupValue,
+.groupDepth2 .groupValue { font-weight: 500; }
+
+/* only the top level sticks — nested headers scroll with their rows */
+.groupDepth1,
+.groupDepth2 { position: static; }
+
+.groupBarHint {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--ink-25);
+}
+
+.levelNum {
+  font-family: var(--font-mono), monospace;
+  font-size: 8px;
+  margin-left: 1px;
+  color: var(--ink-45);
+}

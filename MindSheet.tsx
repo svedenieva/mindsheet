@@ -1,8 +1,19 @@
 'use client';
 
 import { useState, type CSSProperties, type ReactElement } from 'react';
-import type { ColumnDef, MindSheetProps, Row } from './types';
+import type { ColumnDef, MindSheetProps, Row, SortState } from './types';
 import styles from './MindSheet.module.css';
+
+// узел дерева авто-группировки: либо ветка (children), либо лист со строками
+interface GroupNode {
+  path: string;
+  value: string;
+  label: string;
+  depth: number;
+  count: number;
+  children: GroupNode[] | null;
+  rows: Row[];
+}
 
 function cx(...parts: Array<string | false | undefined>): string {
   return parts.filter(Boolean).join(' ');
@@ -40,7 +51,7 @@ export default function MindSheet({
   columns, records, total, loading, filtersPosition = 'top',
   sort, filter, filters, filterOptions, search,
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
-  editable, onCellEdit, onAddRow, autoGroup,
+  editable, onCellEdit, onAddRow, autoGroup, sorts, onSortsChange,
 }: MindSheetProps) {
   const filterables = columns.filter((c) => c.filterable);
   const sidebar = filtersPosition === 'left';
@@ -114,50 +125,83 @@ export default function MindSheet({
   const grid = [lead, ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
 
-  // Авто-группировка. Собираем по ЗНАЧЕНИЮ, а не по соседству строк: одно
-  // значение — ровно одна группа, даже если строки идут вразбивку. Порядок
-  // групп — по правилам колонки (явный order, число или текст) и направлению
-  // сортировки; внутри группы строки сортируются по первой колонке.
-  const groupKey = autoGroup && sort?.key ? sort.key : null;
-  const groupCol = groupKey ? columns.find((c) => c.key === groupKey) : undefined;
-  const groups: Array<{ value: string; rows: Row[] }> = [];
-  if (groupKey) {
+  // Авто-группировка по уровням сортировки (до 3). Собираем по ЗНАЧЕНИЮ, а не
+  // по соседству строк: одно значение — ровно одна группа, даже если строки
+  // идут вразбивку. Порядок групп — по правилам колонки (явный order, число
+  // или текст) и направлению уровня; внутри последнего уровня строки
+  // сортируются по первой колонке.
+  const levels: SortState[] = (sorts?.length ? sorts : sort ? [sort] : []).slice(0, 3);
+  const nameKey = gridCols[0]?.key;
+
+  const groupValue = (r: Row, key: string) => {
+    const raw = hasValue(r[key]) ? String(r[key]).trim() : '';
+    return raw === '' ? '—' : raw;
+  };
+
+  function buildGroups(rows: Row[], depth: number, prefix: string): GroupNode[] {
+    const level = levels[depth];
+    const col = columns.find((c) => c.key === level.key);
+    const dir = level.dir === 'desc' ? -1 : 1;
     const map = new Map<string, Row[]>();
-    for (const r of records) {
-      // нормализуем значение, чтобы «WorkOS» и «workos » попали в одну группу
-      const raw = hasValue(r[groupKey]) ? String(r[groupKey]).trim() : '';
-      const value = raw === '' ? '—' : raw;
+    for (const r of rows) {
+      const value = groupValue(r, level.key);
       const bucket = map.get(value);
       if (bucket) bucket.push(r);
       else map.set(value, [r]);
     }
-    const dir = sort!.dir === 'desc' ? -1 : 1;
     const rank = (v: string) => {
-      if (!groupCol?.order) return -1;
-      const i = groupCol.order.indexOf(v);
-      return i === -1 ? groupCol.order.length : i;
+      if (!col?.order) return -1;
+      const i = col.order.indexOf(v);
+      return i === -1 ? col.order.length : i;
     };
-    const nameKey = gridCols[0]?.key;
-    for (const [value, rows] of map) {
-      if (nameKey) {
-        rows.sort((a, b) =>
-          String(a[nameKey] ?? '').localeCompare(String(b[nameKey] ?? ''), 'ru'),
-        );
+    const out: GroupNode[] = [];
+    for (const [value, bucket] of map) {
+      const path = prefix ? prefix + ' / ' + value : value;
+      const deeper = depth + 1 < levels.length;
+      const label = col?.label ?? level.key;
+      if (deeper) {
+        out.push({
+          path,
+          value,
+          label,
+          depth,
+          count: bucket.length,
+          children: buildGroups(bucket, depth + 1, path),
+          rows: [],
+        });
+      } else {
+        const sorted = nameKey
+          ? [...bucket].sort((a, b) =>
+              String(a[nameKey] ?? '').localeCompare(String(b[nameKey] ?? ''), 'ru'),
+            )
+          : bucket;
+        out.push({ path, value, label, depth, count: bucket.length, children: null, rows: sorted });
       }
-      groups.push({ value, rows });
     }
-    groups.sort((a, b) => {
-      // пустые значения всегда в конце
+    out.sort((a, b) => {
       if (a.value === '—') return 1;
       if (b.value === '—') return -1;
-      if (groupCol?.order) return (rank(a.value) - rank(b.value)) * dir;
-      if (groupCol?.type === 'number') return (Number(a.value) - Number(b.value)) * dir;
+      if (col?.order) return (rank(a.value) - rank(b.value)) * dir;
+      if (col?.type === 'number') return (Number(a.value) - Number(b.value)) * dir;
       return a.value.localeCompare(b.value, 'ru') * dir;
     });
+    return out;
   }
-  const grouped = Boolean(groupKey) && groups.length > 0 && groups.length < records.length;
-  const groupLabel = groupCol?.label ?? groupKey ?? '';
-  const allCollapsed = grouped && groups.every((g) => collapsed.has(g.value));
+
+  const groups: GroupNode[] = autoGroup && levels.length ? buildGroups(records, 0, '') : [];
+  // группировка осмысленна, только если она реально что-то объединяет
+  const grouped = groups.length > 0 && groups.length < records.length;
+  const allPaths: string[] = [];
+  (function collect(nodes: GroupNode[]) {
+    for (const n of nodes) {
+      allPaths.push(n.path);
+      if (n.children) collect(n.children);
+    }
+  })(groups);
+  const allCollapsed = grouped && allPaths.length > 0 && allPaths.every((p) => collapsed.has(p));
+  const levelsLabel = levels
+    .map((l) => columns.find((c) => c.key === l.key)?.label ?? l.key)
+    .join(' → ');
 
   // reusable in-cell editor (used by both edit-in-place and the add-row line)
   const cellInput = (
@@ -234,7 +278,8 @@ export default function MindSheet({
           <div className={styles.tableHead} role="row">
             <div className={styles.caretCell} aria-hidden="true" />
             {gridCols.map((c) => {
-              const active = sort?.key === c.key;
+              const levelIdx = levels.findIndex((l) => l.key === c.key);
+              const active = levelIdx >= 0;
               return (
                 <div
                   key={c.key}
@@ -246,11 +291,19 @@ export default function MindSheet({
                       type="button"
                       className={styles.colHead}
                       data-active={active || undefined}
-                      onClick={() => onSortChange(c.key)}
+                      onClick={(e) =>
+                        onSortsChange
+                          ? onSortsChange(c.key, e.shiftKey || e.ctrlKey || e.metaKey)
+                          : onSortChange(c.key)
+                      }
+                      title="Клик — сортировать; Shift + клик — добавить уровень группировки"
                     >
                       {c.label}
                       <span className={styles.arrow}>
-                        {active ? (sort!.dir === 'asc' ? '▲' : '▼') : ''}
+                        {levelIdx >= 0 ? (levels[levelIdx].dir === 'asc' ? '▲' : '▼') : ''}
+                        {levels.length > 1 && levelIdx >= 0 ? (
+                          <sup className={styles.levelNum}>{levelIdx + 1}</sup>
+                        ) : null}
                       </span>
                     </button>
                   ) : (
@@ -280,38 +333,20 @@ export default function MindSheet({
               <button
                 type="button"
                 className={styles.groupBarBtn}
-                onClick={() =>
-                  setCollapsed(allCollapsed ? new Set() : new Set(groups.map((g) => g.value)))
-                }
+                onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(allPaths))}
               >
                 {allCollapsed ? 'Развернуть все' : 'Свернуть все'}
               </button>
               <span className={styles.groupBarInfo}>
-                группировка: {groupLabel} · {groups.length}
+                группировка: {levelsLabel} · {groups.length}
               </span>
+              {levels.length < 3 && (
+                <span className={styles.groupBarHint}>
+                  Shift + клик по заголовку — добавить уровень
+                </span>
+              )}
             </div>
-            {groups.map((g) => {
-              const isCollapsed = collapsed.has(g.value);
-              return (
-                <div key={g.value}>
-                  <div className={styles.groupRow} role="row">
-                    <button
-                      type="button"
-                      className={styles.groupToggle}
-                      onClick={() => toggleGroup(g.value)}
-                      aria-expanded={!isCollapsed}
-                      title={isCollapsed ? 'Развернуть' : 'Свернуть'}
-                    >
-                      {isCollapsed ? '+' : '−'}
-                    </button>
-                    <span className={styles.groupLabel}>{groupLabel}:</span>
-                    <span className={styles.groupValue}>{g.value}</span>
-                    <span className={styles.groupCount}>{g.rows.length}</span>
-                  </div>
-                  {!isCollapsed && g.rows.map(renderRow)}
-                </div>
-              );
-            })}
+            {groups.map(renderGroup)}
             </>
           ) : (
             records.map(renderRow)
@@ -346,6 +381,34 @@ export default function MindSheet({
           ))}
     </div>
   );
+
+  // рекурсивная отрисовка группы: заголовок + вложенные группы или строки
+  function renderGroup(g: GroupNode) {
+    const isCollapsed = collapsed.has(g.path);
+    return (
+      <div key={g.path}>
+        <div
+          className={cx(styles.groupRow, styles[`groupDepth${g.depth}`])}
+          role="row"
+          style={{ paddingLeft: `${14 + g.depth * 18}px` }}
+        >
+          <button
+            type="button"
+            className={styles.groupToggle}
+            onClick={() => toggleGroup(g.path)}
+            aria-expanded={!isCollapsed}
+            title={isCollapsed ? 'Развернуть' : 'Свернуть'}
+          >
+            {isCollapsed ? '+' : '−'}
+          </button>
+          <span className={styles.groupLabel}>{g.label}:</span>
+          <span className={styles.groupValue}>{g.value}</span>
+          <span className={styles.groupCount}>{g.count}</span>
+        </div>
+        {!isCollapsed && (g.children ? g.children.map(renderGroup) : g.rows.map(renderRow))}
+      </div>
+    );
+  }
 
   // отрисовка одной строки таблицы (плоский и групповой вид)
   function renderRow(r: Row) {

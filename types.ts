@@ -66,6 +66,12 @@ export interface MindSheetProps {
      groups with a +/- toggle (Google-Sheets style). No effect when every
      value is unique. */
   autoGroup?: boolean;
+  /** up to 3 sort levels; each level also becomes a grouping level.
+     Falls back to `sort` when absent. */
+  sorts?: SortState[];
+  /** header click with `additive` (shift/ctrl) appends a sort level instead
+     of replacing the primary one */
+  onSortsChange?: (key: string, additive: boolean) => void;
   /** commit an edited cell: (record, columnKey, newValue) */
   onCellEdit?: (record: Row, key: string, value: string) => void;
   /** append a new row from the bottom input line (columnKey → value) */
