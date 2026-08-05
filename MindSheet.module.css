@@ -16,11 +16,11 @@
 /* tools row — filters, right-aligned above the card, like Fathom's tableTools */
 .tableTools {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .filter {
@@ -32,12 +32,12 @@
 }
 
 .select {
-  padding: 6px 10px;
+  padding: 4px 8px;
   background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--ink);
   cursor: pointer;
 }
@@ -48,10 +48,10 @@
 }
 
 .search {
-  flex: 1;
-  min-width: 160px;
-  max-width: 320px;
-  padding: 7px 12px;
+  flex: 0 1 200px;
+  min-width: 140px;
+  max-width: 240px;
+  padding: 5px 10px;
   background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
@@ -66,7 +66,7 @@
 }
 
 .count {
-  margin-right: auto;
+  margin-left: auto;
   font-family: var(--font-mono), monospace;
   font-size: 12px;
   color: var(--ink-25);
@@ -74,7 +74,7 @@
 
 /* clears the active filter + search in one click; only shown when active */
 .reset {
-  padding: 6px 12px;
+  padding: 4px 10px;
   background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
