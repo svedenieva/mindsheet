@@ -1,8 +1,27 @@
 'use client';
 
-import { useState, type CSSProperties, type ReactElement } from 'react';
-import type { ColumnDef, MindSheetProps, Row, SortState } from './types';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
+import type { ColumnDef, MindSheetProps, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
 import styles from './MindSheet.module.css';
+
+// Примочки из табличных систем, которые задокументированы у вендоров:
+// Google Sheets — WrapStrategy и правило соседней ячейки; Coda — высота строки
+// 1/2/3/All lines и её жёсткая связь с переносом; Excel/Sheets — тяга колонки
+// за границу заголовка и двойной клик для сброса ширины.
+const WRAP_MODES: Array<{ id: WrapStrategy; label: string; hint: string }> = [
+  { id: 'wrap', label: 'Переносить', hint: 'ячейка растягивается под весь объём текста' },
+  { id: 'clip', label: 'Обрезать', hint: 'одна строка, лишнее срезается по границе' },
+  { id: 'overflow', label: 'За границу', hint: 'текст уходит под соседнюю ячейку, если она пустая' },
+];
+
+const LINE_MODES: Array<{ id: RowLines; label: string }> = [
+  { id: 1, label: '1' },
+  { id: 2, label: '2' },
+  { id: 3, label: '3' },
+  { id: 'all', label: 'Всё' },
+];
+
+const MIN_COL_WIDTH = 64;
 
 // узел дерева авто-группировки: либо ветка (children), либо лист со строками
 interface GroupNode {
@@ -53,6 +72,7 @@ export default function MindSheet({
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
   editable, onCellEdit, onAddRow, autoGroup, sorts, onSortsChange, onSortReset,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
+  defaultDisplay, viewKey,
 }: MindSheetProps) {
   const favSet = new Set(favorites ?? []);
   const canFavorite = Boolean(onToggleFavorite);
@@ -67,6 +87,69 @@ export default function MindSheet({
       if (next.has(value)) next.delete(value);
       else next.add(value);
       return next;
+    });
+
+  // ── вид таблицы: перенос текста, высота строки, ширины колонок ──────
+  // Настройка живёт у пользователя, а не у хоста: как в Sheets, где wrap и
+  // высота строки — свойство того, кто смотрит. С viewKey запоминается.
+  const storeKey = viewKey ? `mindsheet:view:${viewKey}` : null;
+  const [display, setDisplay] = useState<ViewDisplay>(() => ({
+    // в режиме таблицы плотность важнее объёма — стартуем с одной строки
+    wrap: 'wrap', lines: editable ? 1 : 3, widths: {}, ...defaultDisplay,
+  }));
+  const [viewOpen, setViewOpen] = useState(false);
+  // читаем сохранённый вид только на клиенте — иначе разъедется гидрация
+  const loaded = useRef(false);
+
+  useEffect(() => {
+    loaded.current = false;
+    if (!storeKey) return;
+    try {
+      const raw = window.localStorage.getItem(storeKey);
+      if (raw) setDisplay((d) => ({ ...d, ...(JSON.parse(raw) as Partial<ViewDisplay>) }));
+    } catch {
+      /* приватный режим или битый JSON — просто едем с настройками по умолчанию */
+    }
+    loaded.current = true;
+  }, [storeKey]);
+
+  useEffect(() => {
+    if (!storeKey || !loaded.current) return;
+    try {
+      window.localStorage.setItem(storeKey, JSON.stringify(display));
+    } catch {
+      /* хранилище недоступно — вид просто не переживёт перезагрузку */
+    }
+  }, [storeKey, display]);
+
+  const setWrap = (wrap: WrapStrategy) => setDisplay((d) => ({ ...d, wrap }));
+  const setLines = (lines: RowLines) => setDisplay((d) => ({ ...d, lines }));
+  const resetWidths = () => setDisplay((d) => ({ ...d, widths: {} }));
+
+  // тяга за правый край заголовка — ширина колонки в px; двойной клик снимает
+  const startResize = (e: ReactPointerEvent<HTMLSpanElement>, key: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const head = (e.currentTarget.parentElement as HTMLElement | null);
+    const startWidth = head?.getBoundingClientRect().width ?? 120;
+    const startX = e.clientX;
+    const move = (ev: globalThis.PointerEvent) => {
+      const w = Math.max(MIN_COL_WIDTH, Math.round(startWidth + ev.clientX - startX));
+      setDisplay((d) => ({ ...d, widths: { ...d.widths, [key]: w } }));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  const autoWidth = (key: string) =>
+    setDisplay((d) => {
+      const widths = { ...d.widths };
+      delete widths[key];
+      return { ...d, widths };
     });
 
   // spreadsheet mode: which cell is open, its draft, and the bottom add-row draft
@@ -126,8 +209,23 @@ export default function MindSheet({
 
   const lead = rowsClickable || editable ? '22px' : '0px';
 
-  const grid = [lead, ...(canFavorite ? ['24px'] : []), ...gridCols.map((c, i) => trackFor(c, i === 0))].join(' ');
+  const sizedCols = Object.keys(display.widths).length > 0;
+  const grid = [
+    lead,
+    ...(canFavorite ? ['24px'] : []),
+    ...gridCols.map((c, i) => (display.widths[c.key] ? `${display.widths[c.key]}px` : trackFor(c, i === 0))),
+  ].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
+
+  // класс ячейки по выбранному режиму. Для «за границу» действует правило
+  // Google: наплывать можно только на пустого соседа, иначе обрезаем.
+  const lineClass = display.lines === 'all' ? styles.linesAll : styles[`lines${display.lines}`];
+  const cellMode = (r: Row, idx: number): string => {
+    if (display.wrap === 'wrap') return cx(styles.wrapCell, lineClass);
+    if (display.wrap === 'clip') return styles.clipCell;
+    const next = gridCols[idx + 1];
+    return !next || !hasValue(r[next.key]) ? styles.spillCell : styles.clipCell;
+  };
 
   // Авто-группировка по уровням сортировки (до 3). Собираем по ЗНАЧЕНИЮ, а не
   // по соседству строк: одно значение — ровно одна группа, даже если строки
@@ -288,6 +386,73 @@ export default function MindSheet({
     </button>
   );
 
+  // «Вид» — перенос текста, высота строки, сброс ширин. Одна кнопка, чтобы
+  // не растягивать панель: раскрывается панелькой поверх таблицы.
+  const displayEl = (
+    <div className={styles.viewMenu}>
+      <button
+        type="button"
+        className={styles.viewBtn}
+        aria-expanded={viewOpen}
+        onClick={() => setViewOpen((o) => !o)}
+        title="Как показывать текст в ячейках"
+      >
+        ▤ Вид
+      </button>
+      {viewOpen && (
+        <>
+          <div className={styles.viewBackdrop} onClick={() => setViewOpen(false)} aria-hidden="true" />
+          <div
+            className={styles.viewPanel}
+            role="dialog"
+            aria-label="Вид таблицы"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setViewOpen(false);
+            }}
+          >
+            <div className={styles.viewHead}>Текст не влез в ячейку</div>
+            {WRAP_MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={cx(styles.viewOpt, display.wrap === m.id && styles.viewOptOn)}
+                onClick={() => setWrap(m.id)}
+              >
+                <span className={styles.viewOptName}>{m.label}</span>
+                <span className={styles.viewOptHint}>{m.hint}</span>
+              </button>
+            ))}
+
+            <div className={styles.viewHead}>Высота строки</div>
+            <div className={styles.viewRow}>
+              {LINE_MODES.map((m) => (
+                <button
+                  key={String(m.id)}
+                  type="button"
+                  className={cx(styles.viewChip, display.lines === m.id && styles.viewChipOn)}
+                  disabled={display.wrap !== 'wrap'}
+                  onClick={() => setLines(m.id)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            {display.wrap !== 'wrap' && (
+              <div className={styles.viewNote}>Высота работает только с переносом — без него строка всегда одна.</div>
+            )}
+
+            {sizedCols && (
+              <button type="button" className={styles.viewLink} onClick={resetWidths}>
+                Вернуть авто-ширину колонок
+              </button>
+            )}
+            <div className={styles.viewNote}>Ширина колонки — тяни за границу заголовка.</div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   const countEl = (
     <span className={styles.count}>
       {isFiltered ? `показано ${records.length} из ${grandTotal}` : `${grandTotal} записей`}
@@ -295,7 +460,7 @@ export default function MindSheet({
   );
 
   const tableEl = (
-    <div className={styles.tableScroll}>
+    <div className={cx(styles.tableScroll, sizedCols && styles.sized)}>
       <div className={cx(styles.table, editable && styles.compact)} style={gridStyle} role="table">
           <div className={styles.tableHead} role="row">
             <div className={styles.caretCell} aria-hidden="true" />
@@ -332,6 +497,15 @@ export default function MindSheet({
                   ) : (
                     c.label
                   )}
+                  <span
+                    className={styles.resizer}
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label={`Ширина колонки ${c.label}`}
+                    title="Тяни — ширина колонки; двойной клик — вернуть авто"
+                    onPointerDown={(e) => startResize(e, c.key)}
+                    onDoubleClick={() => autoWidth(c.key)}
+                  />
                 </div>
               );
             })}
@@ -473,7 +647,7 @@ export default function MindSheet({
             </button>
           </div>
         )}
-        {gridCols.map((c) => {
+        {gridCols.map((c, i) => {
           const editingThis = editable && editing?.id === r.id && editing?.key === c.key;
           return (
             <div
@@ -481,6 +655,7 @@ export default function MindSheet({
               role="cell"
               className={cx(
                 styles.td,
+                editingThis ? styles.wrapCell : cellMode(r, i),
                 c.key === firstKey && styles.strong,
                 isCentered(c) && styles.center,
                 editable && styles.editableTd,
@@ -514,6 +689,7 @@ export default function MindSheet({
             {filterables.length > 0 && <div className={styles.sideHead}>Фильтры</div>}
             {filterEls}
             {favEl}
+            {displayEl}
             {sortResetEl}
             {resetEl}
             {countEl}
@@ -530,8 +706,9 @@ export default function MindSheet({
         {searchEl}
         {filterEls}
         {favEl}
-            {sortResetEl}
-            {resetEl}
+        {displayEl}
+        {sortResetEl}
+        {resetEl}
         {countEl}
       </div>
       {tableEl}

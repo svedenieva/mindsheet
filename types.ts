@@ -27,6 +27,22 @@ export interface SortState {
   dir: 'asc' | 'desc';
 }
 
+/** Поведение текста, который не влез в ячейку. Один в один Google Sheets
+    WrapStrategy (OVERFLOW_CELL / CLIP / WRAP) — включая правило «если соседняя
+    ячейка непустая, OVERFLOW ведёт себя как CLIP». */
+export type WrapStrategy = 'wrap' | 'clip' | 'overflow';
+
+/** Высота строки в строках текста. Модель Coda (1/2/3/All lines): при
+    фиксированной высоте перенос не работает — текст идёт в одну строку. */
+export type RowLines = 1 | 2 | 3 | 'all';
+
+export interface ViewDisplay {
+  wrap: WrapStrategy;
+  lines: RowLines;
+  /** ширины колонок в пикселях; колонка без записи тянется резиновым треком */
+  widths: Record<string, number>;
+}
+
 export interface FilterState {
   key: string;
   value: string;
@@ -82,6 +98,12 @@ export interface MindSheetProps {
   /** when true only favourites are listed (host does the filtering) */
   favoritesOnly?: boolean;
   onFavoritesOnlyChange?: (only: boolean) => void;
+  /** стартовые настройки вида; дальше их меняет сам пользователь через «Вид» */
+  defaultDisplay?: Partial<ViewDisplay>;
+  /** когда задан — настройки вида и ширины колонок запоминаются в localStorage
+      под этим ключом (у каждой базы свой вид, как филтр-вью в Sheets) */
+  viewKey?: string;
+
   /** commit an edited cell: (record, columnKey, newValue) */
   onCellEdit?: (record: Row, key: string, value: string) => void;
   /** append a new row from the bottom input line (columnKey → value) */

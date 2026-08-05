@@ -106,4 +106,54 @@ describe('MindSheet', () => {
     );
     expect(screen.queryByRole('button', { name: /Alpha/ })).toBeNull();
   });
+
+  // ── вид ячейки: правило Google про наплыв на соседа ─────────────────
+  const spillRows: Row[] = [
+    { id: 'a', name: 'Очень длинное название компании', region: 'EU' },
+    { id: 'b', name: 'Очень длинное название компании', region: null },
+  ];
+
+  it('spills over the neighbour only when that neighbour is empty', () => {
+    render(
+      <MindSheet columns={columns} records={spillRows} defaultDisplay={{ wrap: 'overflow' }}
+        onSortChange={() => {}} onFilterChange={() => {}} />,
+    );
+    const [withNeighbour, withoutNeighbour] = screen.getAllByText('Очень длинное название компании');
+    // сосед занят — режем по границе, как OVERFLOW_CELL у Google
+    expect(withNeighbour.className).toMatch(/clipCell/);
+    expect(withNeighbour.className).not.toMatch(/spillCell/);
+    // сосед пустой — можно наплывать
+    expect(withoutNeighbour.className).toMatch(/spillCell/);
+  });
+
+  it('switches the whole grid to clip when the clip mode is chosen', () => {
+    render(
+      <MindSheet columns={columns} records={spillRows} defaultDisplay={{ wrap: 'clip' }}
+        onSortChange={() => {}} onFilterChange={() => {}} />,
+    );
+    for (const cell of screen.getAllByText('Очень длинное название компании')) {
+      expect(cell.className).toMatch(/clipCell/);
+    }
+  });
+
+  it('clamps wrapped cells to the chosen number of lines', () => {
+    render(
+      <MindSheet columns={columns} records={records} defaultDisplay={{ wrap: 'wrap', lines: 1 }}
+        onSortChange={() => {}} onFilterChange={() => {}} />,
+    );
+    const cell = screen.getByText('Alpha');
+    expect(cell.className).toMatch(/wrapCell/);
+    expect(cell.className).toMatch(/lines1/);
+  });
+
+  it('locks row height to one line while wrapping is off', () => {
+    render(
+      <MindSheet columns={columns} records={records} defaultDisplay={{ wrap: 'clip' }}
+        onSortChange={() => {}} onFilterChange={() => {}} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Вид/ }));
+    for (const chip of ['1', '2', '3', 'Всё']) {
+      expect(screen.getByRole('button', { name: chip })).toBeDisabled();
+    }
+  });
 });

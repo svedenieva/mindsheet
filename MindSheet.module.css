@@ -202,6 +202,16 @@
   box-shadow: var(--shadow-card), var(--ring);
 }
 
+/* колонкам задали ширину руками — сетка больше не обязана влезать в экран,
+   включаем горизонтальную прокрутку, как в любой таблице */
+.sized {
+  overflow-x: auto;
+}
+
+.sized .table {
+  min-width: max-content;
+}
+
 .table {
   /* grid-template-columns is supplied per-instance via the --grid custom
      property, computed from the column list. Full width with fluid tracks
@@ -228,10 +238,39 @@
 }
 
 .th {
+  position: relative;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ручка ширины колонки на правой границе заголовка (Sheets/Excel).
+   Держим внутри границ ячейки — у .th обрезка по краю. */
+.resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 1px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.resizer:hover::after {
+  background: var(--sage);
 }
 
 /* number / select columns read better centered */
@@ -307,19 +346,50 @@
   font-size: 12px;
   line-height: 1.45;
   color: var(--ink-70);
-  overflow-wrap: anywhere;
-  /* keep every cell to a few lines so rows stay a uniform, compact height */
+}
+
+/* ── что делать с текстом, который не влез (Google WrapStrategy) ──────
+   WRAP — ячейка тянется вниз, до N строк или до всего объёма;
+   CLIP — одна строка, срез по границе, без многоточия (как у них);
+   OVERFLOW — одна строка, но текст наплывает на соседа. Право наплыть даёт
+   не CSS, а JS: только если соседняя ячейка пустая. */
+.wrapCell {
   display: -webkit-box;
-  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.lines1 { -webkit-line-clamp: 1; }
+.lines2 { -webkit-line-clamp: 2; }
+.lines3 { -webkit-line-clamp: 3; }
+
+/* «Всё» — высота строки под весь объём текста */
+.linesAll {
+  display: block;
+  overflow: visible;
+}
+
+.clipCell {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.spillCell {
+  display: block;
+  white-space: nowrap;
+  overflow: visible;
+  /* наплыв рисуется поверх пустого соседа, а не под ним */
+  position: relative;
+  z-index: 1;
 }
 
 /* first column — the record's name, emphasized */
 .strong {
   font-weight: 600;
   color: var(--ink);
-  -webkit-line-clamp: 2;
 }
 
 /* long free-text columns stay secondary */
@@ -434,8 +504,6 @@
   font-size: 12.5px;
   line-height: 1.3;
   padding: 5px 0;
-  -webkit-line-clamp: 1;
-  display: -webkit-box;
   align-self: center;
 }
 
@@ -617,3 +685,145 @@
   white-space: nowrap;
 }
 .favOnly input { accent-color: var(--sage); }
+
+/* ── «Вид»: перенос текста, высота строки, ширины колонок ───────────── */
+.viewMenu {
+  position: relative;
+  display: inline-flex;
+}
+
+.viewBtn {
+  padding: 4px 10px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--ink-45);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.viewBtn:hover,
+.viewBtn[aria-expanded='true'] {
+  color: var(--ink);
+  border-color: var(--sage);
+}
+
+/* ловит клик мимо панели */
+.viewBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+.viewPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 21;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  background: var(--paper-raised);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card), var(--ring);
+}
+
+.viewHead {
+  font-family: var(--font-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-25);
+  margin-top: 4px;
+}
+
+.viewHead:first-child { margin-top: 0; }
+
+.viewOpt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 8px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.viewOpt:hover { background: var(--wash); }
+
+.viewOptOn {
+  border-color: var(--sage);
+  background: var(--sage-soft);
+}
+
+.viewOptName {
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.viewOptHint {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ink-45);
+}
+
+.viewRow {
+  display: flex;
+  gap: 4px;
+}
+
+.viewChip {
+  flex: 1 1 0;
+  padding: 5px 0;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 12px;
+  color: var(--ink-70);
+  cursor: pointer;
+}
+
+.viewChip:hover:not(:disabled) { border-color: var(--sage); color: var(--ink); }
+
+.viewChipOn {
+  border-color: var(--sage);
+  background: var(--sage-soft);
+  color: var(--ink);
+}
+
+.viewChip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.viewNote {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--ink-25);
+}
+
+.viewLink {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 11.5px;
+  color: var(--sage);
+  cursor: pointer;
+}
+
+.viewLink:hover { text-decoration: underline; }
+
+/* в сайдбаре кнопка занимает всю ширину, панель раскрывается вправо */
+.sidebar .viewMenu { display: flex; }
+.sidebar .viewBtn { width: 100%; text-align: left; }
