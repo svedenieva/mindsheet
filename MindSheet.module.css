@@ -1020,3 +1020,131 @@
 .row:hover.freeze3 > *:nth-child(-n + 3) {
   background: light-dark(#fbfaf8, #181d21);
 }
+
+/* ── карточка записи ─────────────────────────────────────────
+   Сетка остаётся плотной намеренно, а весь объём уходит вбок — так тесноту
+   решают Airtable (expanded record), Smartsheet (details panel), Notion
+   (side peek) и Coda (row layouts). Сюда же попадают длинные текстовые
+   колонки, которых в сетке нет вовсе. */
+.withCard {
+  display: flex;
+  gap: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.withCard > .tableScroll {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.card {
+  flex: none;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--radius-lg);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-card), var(--ring);
+  overflow: hidden;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.cardTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.cardClose {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--ink-25);
+  cursor: pointer;
+}
+.cardClose:hover { color: var(--ink); }
+
+.cardBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cardLabel {
+  font-family: var(--font-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-25);
+}
+
+.cardValue {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-70);
+  overflow-wrap: anywhere;
+}
+
+.cardEditable { cursor: text; border-radius: var(--radius); }
+.cardEditable:hover { background: var(--wash); }
+
+.cardOpen {
+  flex: none;
+  padding: 10px 14px;
+  border: none;
+  border-top: 1px solid var(--rule);
+  background: none;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 12.5px;
+  color: var(--sage);
+  text-align: left;
+  cursor: pointer;
+}
+.cardOpen:hover { background: var(--wash); }
+
+/* кнопка раскрытия в строке */
+.expand {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-25);
+  cursor: pointer;
+}
+.expand:hover { color: var(--sage); }
+
+/* на узком экране карточка занимает всю ширину и ложится под таблицу */
+@media (max-width: 900px) {
+  .withCard { flex-direction: column; }
+  .card { width: 100%; max-height: 60vh; }
+}

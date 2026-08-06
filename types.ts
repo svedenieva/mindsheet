@@ -105,6 +105,11 @@ export interface MindSheetProps {
   /** when true only favourites are listed (host does the filtering) */
   favoritesOnly?: boolean;
   onFavoritesOnlyChange?: (only: boolean) => void;
+  /** Раскрывать строку карточкой сбоку: все поля целиком, включая длинный
+      текст, которого в сетке нет вовсе. Так тесноту решают все не-табличные
+      системы — не режимом отображения, а вторым уровнем интерфейса. */
+  recordCard?: boolean;
+
   /** стартовые настройки вида; дальше их меняет сам пользователь через «Вид» */
   defaultDisplay?: Partial<ViewDisplay>;
   /** когда задан — настройки вида и ширины колонок запоминаются в localStorage

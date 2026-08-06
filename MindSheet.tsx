@@ -105,7 +105,7 @@ export default function MindSheet({
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
   editable, onCellEdit, onAddRow, autoGroup, sorts, onSortsChange, onSortReset,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
-  defaultDisplay, viewKey,
+  recordCard, defaultDisplay, viewKey,
 }: MindSheetProps) {
   const favSet = new Set(favorites ?? []);
   const canFavorite = Boolean(onToggleFavorite);
@@ -257,6 +257,9 @@ export default function MindSheet({
     const width = Math.min(520, Math.max(MIN_COL_WIDTH, Math.ceil(need) + 12));
     setDisplay((d) => ({ ...d, widths: { ...d.widths, [key]: width } }));
   };
+
+  // строка, раскрытая карточкой сбоку
+  const [openRow, setOpenRow] = useState<string | null>(null);
 
   // spreadsheet mode: which cell is open, its draft, and the bottom add-row draft
   const [editing, setEditing] = useState<{ id: string; key: string } | null>(null);
@@ -915,7 +918,26 @@ export default function MindSheet({
             : undefined
         }
       >
-        <div className={styles.caretCell} aria-hidden="true">{rowsClickable ? "›" : ""}</div>
+        {recordCard ? (
+          <div className={styles.caretCell}>
+            {/* раскрыть строку целиком — отдельной кнопкой, чтобы правка
+                ячеек в таблице продолжала работать как раньше */}
+            <button
+              type="button"
+              className={styles.expand}
+              title="Раскрыть запись"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenRow(r.id);
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              ⤢
+            </button>
+          </div>
+        ) : (
+          <div className={styles.caretCell} aria-hidden="true">{rowsClickable ? "›" : ""}</div>
+        )}
         {canFavorite && (
           <div className={styles.caretCell}>
             <button
@@ -966,6 +988,55 @@ export default function MindSheet({
     );
   }
 
+  // ── карточка записи: всё поля целиком, сбоку ────────────────────────
+  // Сетка намеренно остаётся плотной, а объём уходит на второй уровень —
+  // ровно так тесноту решают Airtable, Smartsheet, Notion и Coda. Сюда же
+  // попадают длинные текстовые колонки, которых в сетке нет вовсе.
+  const cardRow = openRow ? records.find((r) => String(r.id) === openRow) : undefined;
+  const cardEl = cardRow && (
+    <aside className={styles.card} role="dialog" aria-label="Запись">
+      <div className={styles.cardHead}>
+        <span className={styles.cardTitle}>
+          {String(cardRow[gridCols[0]?.key ?? 'id'] ?? 'Запись')}
+        </span>
+        <button type="button" className={styles.cardClose} onClick={() => setOpenRow(null)} aria-label="Закрыть">
+          ×
+        </button>
+      </div>
+      <div className={styles.cardBody}>
+        {columns.map((c) => {
+          const value = cardRow[c.key];
+          const editingThis = editable && editing?.id === cardRow.id && editing?.key === c.key;
+          return (
+            <div key={c.key} className={styles.cardField}>
+              <span className={styles.cardLabel}>{c.label}</span>
+              <div
+                className={cx(styles.cardValue, editable && styles.cardEditable)}
+                onClick={editable && !editingThis ? () => startEdit(cardRow, c.key) : undefined}
+              >
+                {editingThis
+                  ? cellInput(c, draft, setDraft, {
+                      autoFocus: true,
+                      commitOnBlur: true,
+                      onCommit: () => commitEdit(cardRow, c.key),
+                      onCancel: () => setEditing(null),
+                    })
+                  : hasValue(value)
+                    ? renderCell(value, c, search)
+                    : <span className={styles.empty}>—</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {onRowOpen && (
+        <button type="button" className={styles.cardOpen} onClick={() => onRowOpen(cardRow)}>
+          Открыть страницей →
+        </button>
+      )}
+    </aside>
+  );
+
   if (sidebar) {
     return (
       <div className={styles.sheet}>
@@ -981,6 +1052,7 @@ export default function MindSheet({
             {countEl}
           </aside>
           {tableEl}
+          {cardEl}
         </div>
       </div>
     );
@@ -997,7 +1069,10 @@ export default function MindSheet({
         {resetEl}
         {countEl}
       </div>
-      {tableEl}
+      <div className={styles.withCard}>
+        {tableEl}
+        {cardEl}
+      </div>
     </div>
   );
 }
