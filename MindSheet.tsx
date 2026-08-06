@@ -131,6 +131,8 @@ export default function MindSheet({
     wrap: 'wrap', lines: editable ? 1 : 3, widths: {}, aggregates: {}, ...defaultDisplay,
   }));
   const [viewOpen, setViewOpen] = useState(false);
+  // раздел итогов внутри панели «Вид» — свёрнут, пока не понадобится
+  const [aggOpen, setAggOpen] = useState(false);
   // читаем сохранённый вид только на клиенте — иначе разъедется гидрация
   const loaded = useRef(false);
 
@@ -293,6 +295,7 @@ export default function MindSheet({
   const lead = rowsClickable || editable ? '22px' : '0px';
 
   const sizedCols = Object.keys(display.widths).length > 0;
+  const aggCount = Object.keys(display.aggregates).length;
   const grid = [
     lead,
     ...(canFavorite ? ['24px'] : []),
@@ -527,8 +530,19 @@ export default function MindSheet({
 
             {autoGroup && (
               <>
-                <div className={styles.viewHead}>Итоги по группам</div>
-                {gridCols.map((c) => (
+                {/* колонок бывает дюжина, и списком они растягивают панель на
+                    весь экран — держим свёрнутыми, раскрывая по требованию */}
+                <button
+                  type="button"
+                  className={styles.viewFold}
+                  aria-expanded={aggOpen}
+                  onClick={() => setAggOpen((o) => !o)}
+                >
+                  <span className={styles.viewFoldCaret} aria-hidden="true">{aggOpen ? '▾' : '▸'}</span>
+                  Итоги по группам
+                  {aggCount > 0 && <span className={styles.viewFoldCount}>{aggCount}</span>}
+                </button>
+                {aggOpen && gridCols.map((c) => (
                   <label key={c.key} className={styles.viewAggRow}>
                     <span className={styles.viewAggName}>{c.label}</span>
                     <select
@@ -542,7 +556,9 @@ export default function MindSheet({
                     </select>
                   </label>
                 ))}
-                <div className={styles.viewNote}>Считается по всей ветке, включая вложенные группы.</div>
+                {aggOpen && (
+                  <div className={styles.viewNote}>Считается по всей ветке, включая вложенные группы.</div>
+                )}
               </>
             )}
 

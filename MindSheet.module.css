@@ -947,3 +947,39 @@
   max-height: min(70vh, 520px);
   overflow-y: auto;
 }
+
+/* сворачиваемый раздел внутри панели «Вид» */
+.viewFold {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  font-family: var(--font-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-25);
+  cursor: pointer;
+  text-align: left;
+}
+
+.viewFold:hover { color: var(--ink-45); }
+
+.viewFoldCaret {
+  font-size: 8px;
+  letter-spacing: 0;
+}
+
+/* сколько итогов уже включено — видно, не раскрывая */
+.viewFoldCount {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sage-soft);
+  font-size: 9px;
+  letter-spacing: 0;
+  color: var(--ink-70);
+}
