@@ -983,3 +983,40 @@
   letter-spacing: 0;
   color: var(--ink-70);
 }
+
+/* ── заморозка первой колонки ────────────────────────────────
+   Как только колонкам задали ширину, таблица едет вбок — и колонка с
+   названием уезжает за экран вместе со всем остальным. Прижимаем её к левому
+   краю: у Notion это Freeze column, у Coda замораживается от одной до пяти.
+   Сколько ячеек прижать, зависит от служебных колонок слева, поэтому вариант
+   выбирается классом, а сдвиги приходят переменными. */
+.freeze1 > *:nth-child(-n + 1),
+.freeze2 > *:nth-child(-n + 2),
+.freeze3 > *:nth-child(-n + 3) {
+  position: sticky;
+  z-index: 3;
+  background: var(--paper-raised);
+}
+
+.freeze1 > *:nth-child(1),
+.freeze2 > *:nth-child(1),
+.freeze3 > *:nth-child(1) { left: 0; }
+
+.freeze2 > *:nth-child(2),
+.freeze3 > *:nth-child(2) { left: var(--fz2, 0px); }
+
+.freeze3 > *:nth-child(3) { left: var(--fz3, 0px); }
+
+/* шапка таблицы и без того липкая сверху — не дадим ей уехать под строки */
+.tableHead.freeze1 > *:nth-child(-n + 1),
+.tableHead.freeze2 > *:nth-child(-n + 2),
+.tableHead.freeze3 > *:nth-child(-n + 3) {
+  z-index: 6;
+  background: light-dark(#fbfaf8, #171c20);
+}
+
+.row:hover.freeze1 > *:nth-child(-n + 1),
+.row:hover.freeze2 > *:nth-child(-n + 2),
+.row:hover.freeze3 > *:nth-child(-n + 3) {
+  background: light-dark(#fbfaf8, #181d21);
+}

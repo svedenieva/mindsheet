@@ -230,12 +230,33 @@ export default function MindSheet({
     window.addEventListener('pointercancel', up);
   };
 
-  const autoWidth = (key: string) =>
-    setDisplay((d) => {
-      const widths = { ...d.widths };
-      delete widths[key];
-      return { ...d, widths };
-    });
+  // Двойной клик по границе — «Fit to data» из Google Таблиц: ширина по
+  // содержимому, а не возврат к резиновому треку. Меряем видимые ячейки
+  // колонки: остальных в DOM всё равно нет, а Google и сам подгоняет по тому,
+  // что показано. Второй двойной клик подряд снимает ширину совсем.
+  const autoWidth = (key: string, index: number) => {
+    const root = tableRef.current;
+    if (!root || display.widths[key]) {
+      setDisplay((d) => {
+        const widths = { ...d.widths };
+        delete widths[key];
+        return { ...d, widths };
+      });
+      return;
+    }
+    const lead = (rowsClickable || editable ? 1 : 0) + (canFavorite ? 1 : 0);
+    let need = 0;
+    for (const row of root.querySelectorAll<HTMLElement>(`.${styles.row}`)) {
+      const cell = row.children[lead + index] as HTMLElement | undefined;
+      if (cell) need = Math.max(need, cell.scrollWidth);
+    }
+    const head = root.querySelector<HTMLElement>(`.${styles.tableHead}`)?.children[lead + index] as HTMLElement | undefined;
+    if (head) need = Math.max(need, head.scrollWidth);
+    if (!need) return;
+    // немного воздуха, чтобы текст не упирался в границу
+    const width = Math.min(520, Math.max(MIN_COL_WIDTH, Math.ceil(need) + 12));
+    setDisplay((d) => ({ ...d, widths: { ...d.widths, [key]: width } }));
+  };
 
   // spreadsheet mode: which cell is open, its draft, and the bottom add-row draft
   const [editing, setEditing] = useState<{ id: string; key: string } | null>(null);
@@ -296,6 +317,21 @@ export default function MindSheet({
 
   const sizedCols = Object.keys(display.widths).length > 0;
   const aggCount = Object.keys(display.aggregates).length;
+
+  // Заморозка первой колонки имеет смысл только когда таблица едет вбок —
+  // то есть после того, как ширины задали руками. Прижимаем служебные ячейки
+  // слева и саму колонку с названием.
+  const CARET_W = 22;
+  const STAR_W = 24;
+  const GAP = 10;
+  const leadCount = (rowsClickable || editable ? 1 : 0) + (canFavorite ? 1 : 0);
+  const freezeClass = sizedCols
+    ? [styles.freeze1, styles.freeze2, styles.freeze3][leadCount]
+    : undefined;
+  const freezeVars = {
+    '--fz2': `${(rowsClickable || editable ? CARET_W : STAR_W) + GAP}px`,
+    '--fz3': `${CARET_W + GAP + STAR_W + GAP}px`,
+  } as CSSProperties;
   const grid = [
     lead,
     ...(canFavorite ? ['24px'] : []),
@@ -391,6 +427,99 @@ export default function MindSheet({
   const levelsLabel = levels
     .map((l) => columns.find((c) => c.key === l.key)?.label ?? l.key)
     .join(' → ');
+
+  // ── что рисуем: плоский список заголовков групп и строк ─────────────
+  // Виртуализация работает по одному списку независимо от того, сгруппировано
+  // сейчас или нет: дерево групп разворачивается в ленту в порядке показа.
+  type Item = { kind: 'group'; node: GroupNode } | { kind: 'row'; row: Row };
+  const items: Item[] = [];
+  if (grouped) {
+    (function walk(nodes: GroupNode[]) {
+      for (const n of nodes) {
+        items.push({ kind: 'group', node: n });
+        if (collapsed.has(n.path)) continue;
+        if (n.children) walk(n.children);
+        else for (const r of n.rows) items.push({ kind: 'row', row: r });
+      }
+    })(groups);
+  } else {
+    for (const r of records) items.push({ kind: 'row', row: r });
+  }
+
+  // ── окно видимых строк ──────────────────────────────────────────────
+  // Раньше в DOM жили все строки разом: на каталоге это почти пять тысяч
+  // ячеек, и каждая смена фильтра стоила почти секунду. Держим только то,
+  // что попадает в видимую часть, плюс запас сверху и снизу.
+  const OVERSCAN = 8;
+  const estRow = editable ? 30 : display.wrap !== 'wrap' ? 40 : display.lines === 1 ? 40 : 79;
+  const estGroup = 34;
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewport, setViewport] = useState(900);
+  const heights = useRef<number[]>([]);
+
+  // при смене набора строк или режима старые замеры больше не про эти строки
+  const shapeKey = `${records.length}|${items.length}|${display.wrap}|${display.lines}|${grouped}`;
+  const prevShape = useRef(shapeKey);
+  if (prevShape.current !== shapeKey) {
+    prevShape.current = shapeKey;
+    heights.current = [];
+  }
+
+  const heightAt = (i: number) =>
+    heights.current[i] ?? (items[i]?.kind === 'group' ? estGroup : estRow);
+
+  // смещения считаем префиксной суммой — на четырёх сотнях элементов это
+  // дешевле, чем держать отдельную структуру и её синхронизировать
+  const offsets: number[] = new Array(items.length + 1);
+  offsets[0] = 0;
+  for (let i = 0; i < items.length; i++) offsets[i + 1] = offsets[i] + heightAt(i);
+  const totalH = offsets[items.length];
+
+  let from = 0;
+  while (from < items.length && offsets[from + 1] < scrollTop) from++;
+  let to = from;
+  while (to < items.length && offsets[to] < scrollTop + viewport) to++;
+  from = Math.max(0, from - OVERSCAN);
+  to = Math.min(items.length, to + OVERSCAN);
+
+  const padTop = offsets[from];
+  const padBottom = Math.max(0, totalH - offsets[to]);
+
+  // следим за прокруткой и размером окна прокрутки
+  useEffect(() => {
+    const root = tableRef.current;
+    if (!root) return;
+    // без «прореживания» через кадры анимации: событие прокрутки приходит
+    // всегда, а кадры — нет (например, во вкладке, которую не показывают).
+    // Рисуем мы теперь два десятка строк, так что обновление на каждое
+    // событие дешевле, чем риск не обновиться вовсе.
+    const onScroll = () => setScrollTop(root.scrollTop);
+    const ro = new ResizeObserver(() => setViewport(root.clientHeight || 900));
+    ro.observe(root);
+    setViewport(root.clientHeight || 900);
+    root.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      root.removeEventListener('scroll', onScroll);
+      ro.disconnect();
+    };
+  }, []);
+
+  // фактические высоты запоминаем: оценка нужна только до первого показа,
+  // дальше список считается по настоящим размерам и прокрутка не «плывёт»
+  useLayoutEffect(() => {
+    const root = tableRef.current;
+    if (!root) return;
+    let changed = false;
+    for (const el of root.querySelectorAll<HTMLElement>('[data-vi]')) {
+      const i = Number(el.dataset.vi);
+      const h = el.getBoundingClientRect().height;
+      if (h > 0 && Math.abs((heights.current[i] ?? -1) - h) > 1) {
+        heights.current[i] = h;
+        changed = true;
+      }
+    }
+    if (changed) setScrollTop((v) => v + 0.0001);
+  });
 
   // reusable in-cell editor (used by both edit-in-place and the add-row line)
   const cellInput = (
@@ -583,10 +712,10 @@ export default function MindSheet({
   const tableEl = (
     <div className={cx(styles.tableScroll, sizedCols && styles.sized)} ref={tableRef}>
       <div className={cx(styles.table, editable && styles.compact)} style={gridStyle} role="table">
-          <div className={styles.tableHead} role="row">
+          <div className={cx(styles.tableHead, freezeClass)} style={freezeVars} role="row">
             <div className={styles.caretCell} aria-hidden="true" />
             {canFavorite && <div className={styles.caretCell} aria-hidden="true">★</div>}
-            {gridCols.map((c) => {
+            {gridCols.map((c, ci) => {
               const levelIdx = levels.findIndex((l) => l.key === c.key);
               const active = levelIdx >= 0;
               return (
@@ -628,9 +757,9 @@ export default function MindSheet({
                     role="separator"
                     aria-orientation="vertical"
                     aria-label={`Ширина колонки ${c.label}`}
-                    title="Тяни — ширина колонки; двойной клик — вернуть авто"
+                    title="Тяни — ширина колонки; двойной клик — подогнать по содержимому"
                     onPointerDown={(e) => startResize(e, c.key)}
-                    onDoubleClick={() => autoWidth(c.key)}
+                    onDoubleClick={() => autoWidth(c.key, ci)}
                   />
                 </div>
               );
@@ -651,29 +780,37 @@ export default function MindSheet({
             ))
           ) : records.length === 0 ? (
             <div className={styles.none}>Ничего не найдено</div>
-          ) : grouped ? (
-            <>
-            <div className={styles.groupBar} role="row">
-              <button
-                type="button"
-                className={styles.groupBarBtn}
-                onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(allPaths))}
-              >
-                {allCollapsed ? 'Развернуть все' : 'Свернуть все'}
-              </button>
-              <span className={styles.groupBarInfo}>
-                группировка: {levelsLabel} · {groups.length}
-              </span>
-              {levels.length < 3 && (
-                <span className={styles.groupBarHint}>
-                  Shift + клик по заголовку — добавить уровень
-                </span>
-              )}
-            </div>
-            {groups.map(renderGroup)}
-            </>
           ) : (
-            records.map(renderRow)
+            <>
+            {grouped && (
+              <div className={styles.groupBar} role="row">
+                <button
+                  type="button"
+                  className={styles.groupBarBtn}
+                  onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(allPaths))}
+                >
+                  {allCollapsed ? 'Развернуть все' : 'Свернуть все'}
+                </button>
+                <span className={styles.groupBarInfo}>
+                  группировка: {levelsLabel} · {groups.length}
+                </span>
+                {levels.length < 3 && (
+                  <span className={styles.groupBarHint}>
+                    Shift + клик по заголовку — добавить уровень
+                  </span>
+                )}
+              </div>
+            )}
+            {/* распорки держат высоту прокрутки за невидимые строки */}
+            {padTop > 0 && <div style={{ height: padTop }} aria-hidden="true" />}
+            {items.slice(from, to).map((it, k) => {
+              const i = from + k;
+              return it.kind === 'group'
+                ? renderGroupHead(it.node, i)
+                : renderRow(it.row, i);
+            })}
+            {padBottom > 0 && <div style={{ height: padBottom }} aria-hidden="true" />}
+            </>
           )}
 
           {editable && !loading && (
@@ -713,8 +850,9 @@ export default function MindSheet({
     return g.children ? g.children.flatMap(rowsOf) : g.rows;
   }
 
-  // рекурсивная отрисовка группы: заголовок + вложенные группы или строки
-  function renderGroup(g: GroupNode) {
+  // Заголовок группы. Вложенные узлы и строки больше не рисуются отсюда —
+  // порядок задаёт плоский список, из которого берётся видимое окно.
+  function renderGroupHead(g: GroupNode, index: number) {
     const isCollapsed = collapsed.has(g.path);
     const aggKeys = Object.keys(display.aggregates);
     const totals = aggKeys.length
@@ -727,12 +865,13 @@ export default function MindSheet({
           .filter(Boolean)
       : [];
     return (
-      <div key={g.path}>
-        <div
-          className={cx(styles.groupRow, styles[`groupDepth${g.depth}`])}
-          role="row"
-          style={{ paddingLeft: `${14 + g.depth * 18}px` }}
-        >
+      <div
+        key={g.path}
+        data-vi={index}
+        className={cx(styles.groupRow, styles[`groupDepth${g.depth}`])}
+        role="row"
+        style={{ paddingLeft: `${14 + g.depth * 18}px` }}
+      >
           <button
             type="button"
             className={styles.groupToggle}
@@ -749,19 +888,19 @@ export default function MindSheet({
               {t!.label} <b>{t!.value}</b>
             </span>
           ))}
-          <span className={styles.groupCount}>{g.count}</span>
-        </div>
-        {!isCollapsed && (g.children ? g.children.map(renderGroup) : g.rows.map(renderRow))}
+        <span className={styles.groupCount}>{g.count}</span>
       </div>
     );
   }
 
   // отрисовка одной строки таблицы (плоский и групповой вид)
-  function renderRow(r: Row) {
+  function renderRow(r: Row, index: number) {
     return (
       <div
         key={r.id}
-        className={cx(styles.row, rowsClickable && styles.clickable)}
+        data-vi={index}
+        className={cx(styles.row, rowsClickable && styles.clickable, freezeClass)}
+        style={freezeVars}
         role={rowsClickable ? "button" : "row"}
         tabIndex={rowsClickable ? 0 : undefined}
         onClick={rowsClickable ? () => onRowOpen!(r) : undefined}
