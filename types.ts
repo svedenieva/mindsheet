@@ -27,10 +27,15 @@ export interface SortState {
   dir: 'asc' | 'desc';
 }
 
-/** Поведение текста, который не влез в ячейку. Один в один Google Sheets
-    WrapStrategy (OVERFLOW_CELL / CLIP / WRAP) — включая правило «если соседняя
-    ячейка непустая, OVERFLOW ведёт себя как CLIP». */
-export type WrapStrategy = 'wrap' | 'clip' | 'overflow';
+/** Поведение текста, который не влез в ячейку. Три первых — один в один Google
+    Sheets WrapStrategy (WRAP / CLIP / OVERFLOW_CELL), включая правило «если
+    соседняя ячейка непустая, OVERFLOW ведёт себя как CLIP». Четвёртый взят у
+    Excel: Shrink to fit — «Data in the cell reduces to fit the column width». */
+export type WrapStrategy = 'wrap' | 'clip' | 'overflow' | 'shrink';
+
+/** Итог по колонке в заголовке группы. Набор — из group-by views Google Таблиц
+    (Sum, Average, Min, Max, Filled, Unique). */
+export type AggKind = 'none' | 'sum' | 'avg' | 'min' | 'max' | 'filled' | 'unique';
 
 /** Высота строки в строках текста. Модель Coda (1/2/3/All lines): при
     фиксированной высоте перенос не работает — текст идёт в одну строку. */
@@ -41,6 +46,8 @@ export interface ViewDisplay {
   lines: RowLines;
   /** ширины колонок в пикселях; колонка без записи тянется резиновым треком */
   widths: Record<string, number>;
+  /** какой итог показывать в заголовке группы: ключ колонки → вид итога */
+  aggregates: Record<string, AggKind>;
 }
 
 export interface FilterState {

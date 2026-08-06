@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
-import type { ColumnDef, MindSheetProps, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
+import type { AggKind, ColumnDef, MindSheetProps, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
 import styles from './MindSheet.module.css';
 
 // Примочки из табличных систем, которые задокументированы у вендоров:
@@ -12,7 +12,40 @@ const WRAP_MODES: Array<{ id: WrapStrategy; label: string; hint: string }> = [
   { id: 'wrap', label: 'Переносить', hint: 'ячейка растягивается под весь объём текста' },
   { id: 'clip', label: 'Обрезать', hint: 'одна строка, лишнее срезается по границе' },
   { id: 'overflow', label: 'За границу', hint: 'текст уходит под соседнюю ячейку, если она пустая' },
+  { id: 'shrink', label: 'Сжать', hint: 'шрифт уменьшается под ширину; что не влезло и в 8px — обрезается' },
 ];
+
+// Итоги по группам — набор из group-by views Google Таблиц.
+const AGG_MODES: Array<{ id: AggKind; label: string; numeric: boolean }> = [
+  { id: 'none', label: '—', numeric: false },
+  { id: 'sum', label: 'сумма', numeric: true },
+  { id: 'avg', label: 'среднее', numeric: true },
+  { id: 'min', label: 'мин', numeric: true },
+  { id: 'max', label: 'макс', numeric: true },
+  { id: 'filled', label: 'заполнено', numeric: false },
+  { id: 'unique', label: 'уникальных', numeric: false },
+];
+
+// Ниже этого размера сжимать бессмысленно — дальше уже не читается,
+// поэтому остаток честно обрезаем.
+const MIN_SHRINK_PX = 8;
+
+function aggregate(rows: Row[], key: string, kind: AggKind): string | null {
+  if (kind === 'none' || rows.length === 0) return null;
+  const values = rows.map((r) => r[key]);
+  const filled = values.filter(hasValue);
+
+  if (kind === 'filled') return `${filled.length} из ${rows.length}`;
+  if (kind === 'unique') return String(new Set(filled.map((v) => String(v))).size);
+
+  const nums = filled.map((v) => Number(String(v).replace(',', '.'))).filter((n) => Number.isFinite(n));
+  if (!nums.length) return null;
+  const round = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+  if (kind === 'sum') return round(nums.reduce((a, b) => a + b, 0));
+  if (kind === 'avg') return round(nums.reduce((a, b) => a + b, 0) / nums.length);
+  if (kind === 'min') return round(Math.min(...nums));
+  return round(Math.max(...nums));
+}
 
 const LINE_MODES: Array<{ id: RowLines; label: string }> = [
   { id: 1, label: '1' },
@@ -95,7 +128,7 @@ export default function MindSheet({
   const storeKey = viewKey ? `mindsheet:view:${viewKey}` : null;
   const [display, setDisplay] = useState<ViewDisplay>(() => ({
     // в режиме таблицы плотность важнее объёма — стартуем с одной строки
-    wrap: 'wrap', lines: editable ? 1 : 3, widths: {}, ...defaultDisplay,
+    wrap: 'wrap', lines: editable ? 1 : 3, widths: {}, aggregates: {}, ...defaultDisplay,
   }));
   const [viewOpen, setViewOpen] = useState(false);
   // читаем сохранённый вид только на клиенте — иначе разъедется гидрация
@@ -125,6 +158,49 @@ export default function MindSheet({
   const setWrap = (wrap: WrapStrategy) => setDisplay((d) => ({ ...d, wrap }));
   const setLines = (lines: RowLines) => setDisplay((d) => ({ ...d, lines }));
   const resetWidths = () => setDisplay((d) => ({ ...d, widths: {} }));
+  const setAgg = (key: string, kind: AggKind) =>
+    setDisplay((d) => {
+      const aggregates = { ...d.aggregates };
+      if (kind === 'none') delete aggregates[key];
+      else aggregates[key] = kind;
+      return { ...d, aggregates };
+    });
+
+  // «Сжать» = Shrink to fit из Excel. CSS такого не умеет, поэтому меряем сами:
+  // сначала сбрасываем размер у всех ячеек, потом читаем — так браузер считает
+  // раскладку дважды на всю таблицу, а не дважды на каждую ячейку.
+  const tableRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const root = tableRef.current;
+    if (!root) return;
+    // вне режима таких ячеек нет вовсе, так что выборка пустая и стоит копейки
+    const all = Array.from(root.querySelectorAll<HTMLElement>(`.${styles.shrinkCell}`));
+    for (const c of all) c.style.fontSize = '';
+    if (display.wrap !== 'shrink' || !all.length) return;
+    // Короткие значения — регион, год, галочка — не переполняют даже узкую
+    // колонку, а замер каждой ячейки стоит пересчёта раскладки. Длину текста
+    // читаем без обращения к раскладке, поэтому отсев бесплатный.
+    const cells = all.filter((c) => (c.textContent ?? '').length >= 10);
+    if (!cells.length) return;
+    // базовый размер один на всю таблицу — читаем его один раз, а не по ячейке:
+    // getComputedStyle на каждую из тысяч ячеек стоил дороже самих замеров
+    const base = parseFloat(getComputedStyle(cells[0]).fontSize) || 12;
+
+    // Замеры идут двумя проходами — сначала читаем все размеры, потом
+    // проставляем: иначе браузер пересчитывал бы раскладку на каждой ячейке.
+    // Цена всё равно заметная: на каталоге в 400 строк это примерно полсекунды
+    // при каждой смене данных. Платит её только тот, кто выбрал этот режим,
+    // — по-настоящему дёшево станет, когда таблица начнёт отрисовывать лишь
+    // видимые строки, а это отдельная работа.
+    const sizes = cells.map((c) => ({ full: c.scrollWidth, box: c.clientWidth }));
+    cells.forEach((c, i) => {
+      const { full, box } = sizes[i];
+      if (!box || full <= box + 1) return;
+      c.style.fontSize = `${Math.max(MIN_SHRINK_PX, Math.floor(base * (box / full) * 10) / 10)}px`;
+    });
+    // пересчитываем только когда меняется то, от чего зависит раскладка,
+    // а не на каждую перерисовку — иначе цена платится при каждом фильтре
+  }, [display.wrap, display.widths, display.lines, records, columns]);
 
   // тяга за правый край заголовка — ширина колонки в px; двойной клик снимает
   const startResize = (e: ReactPointerEvent<HTMLSpanElement>, key: string) => {
@@ -230,6 +306,7 @@ export default function MindSheet({
   const cellMode = (r: Row, idx: number): string => {
     if (display.wrap === 'wrap') return cx(styles.wrapCell, lineClass);
     if (display.wrap === 'clip') return styles.clipCell;
+    if (display.wrap === 'shrink') return styles.shrinkCell;
     const next = gridCols[idx + 1];
     return !next || !hasValue(r[next.key]) ? styles.spillCell : styles.clipCell;
   };
@@ -448,6 +525,27 @@ export default function MindSheet({
               <div className={styles.viewNote}>Высота работает только с переносом — без него строка всегда одна.</div>
             )}
 
+            {autoGroup && (
+              <>
+                <div className={styles.viewHead}>Итоги по группам</div>
+                {gridCols.map((c) => (
+                  <label key={c.key} className={styles.viewAggRow}>
+                    <span className={styles.viewAggName}>{c.label}</span>
+                    <select
+                      className={styles.viewAggSelect}
+                      value={display.aggregates[c.key] ?? 'none'}
+                      onChange={(e) => setAgg(c.key, e.target.value as AggKind)}
+                    >
+                      {AGG_MODES.filter((m) => !m.numeric || c.type === 'number').map((m) => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+                <div className={styles.viewNote}>Считается по всей ветке, включая вложенные группы.</div>
+              </>
+            )}
+
             {sizedCols && (
               <button type="button" className={styles.viewLink} onClick={resetWidths}>
                 Вернуть авто-ширину колонок
@@ -467,7 +565,7 @@ export default function MindSheet({
   );
 
   const tableEl = (
-    <div className={cx(styles.tableScroll, sizedCols && styles.sized)}>
+    <div className={cx(styles.tableScroll, sizedCols && styles.sized)} ref={tableRef}>
       <div className={cx(styles.table, editable && styles.compact)} style={gridStyle} role="table">
           <div className={styles.tableHead} role="row">
             <div className={styles.caretCell} aria-hidden="true" />
@@ -593,9 +691,25 @@ export default function MindSheet({
     </div>
   );
 
+  // все строки ветки, включая вложенные — итог у родителя должен считаться
+  // по всему, что под ним, а не по тому, что лежит прямо в нём
+  function rowsOf(g: GroupNode): Row[] {
+    return g.children ? g.children.flatMap(rowsOf) : g.rows;
+  }
+
   // рекурсивная отрисовка группы: заголовок + вложенные группы или строки
   function renderGroup(g: GroupNode) {
     const isCollapsed = collapsed.has(g.path);
+    const aggKeys = Object.keys(display.aggregates);
+    const totals = aggKeys.length
+      ? aggKeys
+          .map((key) => {
+            const col = columns.find((c) => c.key === key);
+            const value = aggregate(rowsOf(g), key, display.aggregates[key]);
+            return value === null ? null : { label: col?.label ?? key, value };
+          })
+          .filter(Boolean)
+      : [];
     return (
       <div key={g.path}>
         <div
@@ -614,6 +728,11 @@ export default function MindSheet({
           </button>
           <span className={styles.groupLabel}>{g.label}:</span>
           <span className={styles.groupValue}>{g.value}</span>
+          {totals.map((t) => (
+            <span key={t!.label} className={styles.groupAgg}>
+              {t!.label} <b>{t!.value}</b>
+            </span>
+          ))}
           <span className={styles.groupCount}>{g.count}</span>
         </div>
         {!isCollapsed && (g.children ? g.children.map(renderGroup) : g.rows.map(renderRow))}
