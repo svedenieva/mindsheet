@@ -240,19 +240,31 @@
 .th {
   position: relative;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  /* обрезка ушла на .thLabel: ячейке нужен visible, иначе ручка ширины,
+     торчащая в зазор между колонками, срезалась бы по краю ячейки */
+  overflow: visible;
+}
+
+.thLabel {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ручка ширины колонки на правой границе заголовка (Sheets/Excel).
-   Держим внутри границ ячейки — у .th обрезка по краю. */
+/* Ручка ширины колонки (Sheets/Excel). Живёт на правой границе и намеренно
+   вылезает в зазор сетки: человек тянет за видимую границу колонки, а она
+   проходит именно там, между ячейками, а не внутри одной из них.
+   Высота — на всю строку заголовка, чтобы попадать не пикселем. */
 .resizer {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 8px;
+  top: -8px;
+  bottom: -8px;
+  right: -9px;
+  width: 16px;
+  z-index: 2;
   cursor: col-resize;
   touch-action: none;
 }
@@ -260,16 +272,17 @@
 .resizer::after {
   content: '';
   position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 1px;
+  top: 6px;
+  bottom: 6px;
+  left: 7px;
   width: 2px;
   border-radius: 2px;
   background: transparent;
   transition: background-color 0.12s ease;
 }
 
-.resizer:hover::after {
+.resizer:hover::after,
+.resizer:active::after {
   background: var(--sage);
 }
 

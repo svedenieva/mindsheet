@@ -133,16 +133,23 @@ export default function MindSheet({
     const head = (e.currentTarget.parentElement as HTMLElement | null);
     const startWidth = head?.getBoundingClientRect().width ?? 120;
     const startX = e.clientX;
+    // тянуть можно и мимо ручки — события ловим на окне; заодно глушим
+    // выделение текста, иначе протяжка выделяет заголовки соседних колонок
+    const prevSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
     const move = (ev: globalThis.PointerEvent) => {
       const w = Math.max(MIN_COL_WIDTH, Math.round(startWidth + ev.clientX - startX));
       setDisplay((d) => ({ ...d, widths: { ...d.widths, [key]: w } }));
     };
     const up = () => {
+      document.body.style.userSelect = prevSelect;
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   };
 
   const autoWidth = (key: string) =>
@@ -474,29 +481,34 @@ export default function MindSheet({
                   role="columnheader"
                   className={cx(styles.th, isCentered(c) && styles.center)}
                 >
-                  {c.sortable ? (
-                    <button
-                      type="button"
-                      className={styles.colHead}
-                      data-active={active || undefined}
-                      onClick={(e) =>
-                        onSortsChange
-                          ? onSortsChange(c.key, e.shiftKey || e.ctrlKey || e.metaKey)
-                          : onSortChange(c.key)
-                      }
-                      title="Клик — сортировать; Shift + клик — добавить уровень группировки"
-                    >
-                      {c.label}
-                      <span className={styles.arrow}>
-                        {levelIdx >= 0 ? (levels[levelIdx].dir === 'asc' ? '▲' : '▼') : ''}
-                        {levels.length > 1 && levelIdx >= 0 ? (
-                          <sup className={styles.levelNum}>{levelIdx + 1}</sup>
-                        ) : null}
-                      </span>
-                    </button>
-                  ) : (
-                    c.label
-                  )}
+                  {/* подпись клипуем отдельным слоем: сама ячейка обязана
+                      остаться overflow: visible, иначе ручку ширины срежет
+                      по её же краю */}
+                  <span className={styles.thLabel}>
+                    {c.sortable ? (
+                      <button
+                        type="button"
+                        className={styles.colHead}
+                        data-active={active || undefined}
+                        onClick={(e) =>
+                          onSortsChange
+                            ? onSortsChange(c.key, e.shiftKey || e.ctrlKey || e.metaKey)
+                            : onSortChange(c.key)
+                        }
+                        title="Клик — сортировать; Shift + клик — добавить уровень группировки"
+                      >
+                        {c.label}
+                        <span className={styles.arrow}>
+                          {levelIdx >= 0 ? (levels[levelIdx].dir === 'asc' ? '▲' : '▼') : ''}
+                          {levels.length > 1 && levelIdx >= 0 ? (
+                            <sup className={styles.levelNum}>{levelIdx + 1}</sup>
+                          ) : null}
+                        </span>
+                      </button>
+                    ) : (
+                      c.label
+                    )}
+                  </span>
                   <span
                     className={styles.resizer}
                     role="separator"

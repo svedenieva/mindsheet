@@ -1,0 +1,88 @@
+/* Токены хоста. Компонент не знает ни одного своего цвета — он читает эти
+   переменные, поэтому демо задаёт тему целиком здесь. */
+:root {
+  color-scheme: light dark;
+
+  --font-sans: system-ui;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --paper: light-dark(#fbfaf7, #16171a);
+  --paper-raised: light-dark(#ffffff, #1d1f23);
+  --wash: light-dark(#f1efe9, #24272c);
+
+  --ink: light-dark(#1c1b18, #e8e6e1);
+  --ink-70: light-dark(rgba(28, 27, 24, 0.7), rgba(232, 230, 225, 0.7));
+  --ink-45: light-dark(rgba(28, 27, 24, 0.45), rgba(232, 230, 225, 0.45));
+  --ink-25: light-dark(rgba(28, 27, 24, 0.25), rgba(232, 230, 225, 0.25));
+
+  --rule: light-dark(#e2ded4, #32363c);
+  --rule-soft: light-dark(#eeebe3, #282c31);
+  --grid: light-dark(#efece5, #2a2e33);
+
+  --sage: light-dark(#5c8a6a, #7fb08d);
+  --sage-hover: light-dark(#4a7357, #93c1a0);
+  --sage-soft: light-dark(#e6efe8, #1f2a23);
+  --ring: light-dark(rgba(92, 138, 106, 0.35), rgba(127, 176, 141, 0.35));
+
+  --radius: 6px;
+  --radius-lg: 12px;
+  --shadow-card:
+    0 1px 2px light-dark(rgba(28, 27, 24, 0.05), rgba(0, 0, 0, 0.3)),
+    0 8px 24px light-dark(rgba(28, 27, 24, 0.06), rgba(0, 0, 0, 0.35));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+}
+
+.page__title {
+  margin: 0 0 12px;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.page__lead {
+  max-width: 68ch;
+  margin: 0 0 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-70);
+}
+
+.page__lead code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--wash);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.page__hints {
+  max-width: 68ch;
+  margin: 0 0 28px;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--ink-45);
+}
+
+.page__foot {
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--ink-45);
+}
