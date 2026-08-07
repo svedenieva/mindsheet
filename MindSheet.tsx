@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
-import type { AggKind, ColumnDef, MindSheetProps, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
+import type { AggKind, ColumnDef, ColumnType, MindSheetProps, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
 import styles from './MindSheet.module.css';
 
 // Примочки из табличных систем, которые задокументированы у вендоров:
@@ -56,6 +56,18 @@ const LINE_MODES: Array<{ id: RowLines; label: string }> = [
 
 const MIN_COL_WIDTH = 64;
 
+// типы колонок для меню и формы добавления — те же, что принимает бэкенд
+const COLUMN_TYPES: Array<{ id: ColumnType; label: string }> = [
+  { id: 'text', label: 'Текст' },
+  { id: 'number', label: 'Число' },
+  { id: 'select', label: 'Выбор' },
+  { id: 'url', label: 'Ссылка' },
+  { id: 'long-text', label: 'Длинный текст' },
+];
+
+// ширина хвостового трека под кнопку «+ колонка»
+const ADD_COL_TRACK = 40;
+
 // узел дерева авто-группировки: либо ветка (children), либо лист со строками
 interface GroupNode {
   path: string;
@@ -105,7 +117,9 @@ export default function MindSheet({
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
   editable, onCellEdit, onAddRow, autoGroup, sorts, onSortsChange, onSortReset,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
-  recordCard, defaultDisplay, viewKey,
+  recordCard,
+  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnsReorder,
+  defaultDisplay, viewKey,
 }: MindSheetProps) {
   const favSet = new Set(favorites ?? []);
   const canFavorite = Boolean(onToggleFavorite);
@@ -261,6 +275,48 @@ export default function MindSheet({
   // строка, раскрытая карточкой сбоку
   const [openRow, setOpenRow] = useState<string | null>(null);
 
+  // ── живое управление колонками ──────────────────────────────────────
+  const [colMenu, setColMenu] = useState<string | null>(null); // key колонки с открытым меню
+  const [colRename, setColRename] = useState<{ key: string; draft: string } | null>(null);
+  const [dragCol, setDragCol] = useState<string | null>(null); // перетаскиваемая колонка
+  const [dropCol, setDropCol] = useState<string | null>(null); // цель, над которой висим
+  const [addingCol, setAddingCol] = useState(false);
+  const [newCol, setNewCol] = useState<{ label: string; type: ColumnType }>({ label: '', type: 'text' });
+
+  useEffect(() => {
+    if (!colMenu) return;
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(`.${styles.colMenuPanel}, .${styles.colMenuBtn}`)) setColMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setColMenu(null); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [colMenu]);
+
+  // сколько значений колонки не станут числом при смене типа — для честного
+  // предупреждения перед конверсией (то, чего рынок в открытую не делает)
+  const lossToNumber = (key: string): number => {
+    let bad = 0;
+    for (const r of records) {
+      const v = r[key];
+      if (v === null || v === undefined || String(v).trim() === '') continue;
+      if (!Number.isFinite(Number(String(v).replace(',', '.')))) bad++;
+    }
+    return bad;
+  };
+
+  const doRetype = (key: string, type: ColumnType) => {
+    if (type === 'number') {
+      const bad = lossToNumber(key);
+      if (bad > 0 && !window.confirm(`${bad} значений не станут числом — они останутся как есть, но сортировка и итоги их не учтут. Сменить тип?`)) {
+        return;
+      }
+    }
+    onColumnRetype?.(key, type);
+    setColMenu(null);
+  };
+
   // карточка ведёт себя как остальные оверлеи: Esc и клик вне закрывают.
   // Раньше закрыть можно было только крестиком — вразрез с окном дерева и
   // панелью «Вид», которые закрываются и так.
@@ -363,6 +419,8 @@ export default function MindSheet({
     lead,
     ...(canFavorite ? ['24px'] : []),
     ...gridCols.map((c, i) => (display.widths[c.key] ? `${display.widths[c.key]}px` : trackFor(c, i === 0))),
+    // хвостовой трек под «+ колонка»; строки его просто оставляют пустым
+    ...(editableColumns ? [`${ADD_COL_TRACK}px`] : []),
   ].join(' ');
   const gridStyle = { '--grid': grid } as CSSProperties;
 
@@ -749,13 +807,48 @@ export default function MindSheet({
                 <div
                   key={c.key}
                   role="columnheader"
-                  className={cx(styles.th, isCentered(c) && styles.center)}
+                  className={cx(
+                    styles.th,
+                    isCentered(c) && styles.center,
+                    dragCol === c.key && styles.thDragging,
+                    dropCol === c.key && styles.thDropTarget,
+                  )}
+                  draggable={editableColumns && !colRename}
+                  onDragStart={editableColumns ? () => setDragCol(c.key) : undefined}
+                  onDragOver={editableColumns ? (e) => { e.preventDefault(); if (dragCol && dragCol !== c.key) setDropCol(c.key); } : undefined}
+                  onDragEnd={editableColumns ? () => { setDragCol(null); setDropCol(null); } : undefined}
+                  onDrop={editableColumns ? (e) => {
+                    e.preventDefault();
+                    if (dragCol && dragCol !== c.key) {
+                      const keys = gridCols.map((g) => g.key).filter((k) => k !== dragCol);
+                      const at = keys.indexOf(c.key);
+                      keys.splice(at, 0, dragCol);
+                      onColumnsReorder?.(keys);
+                    }
+                    setDragCol(null); setDropCol(null);
+                  } : undefined}
                 >
                   {/* подпись клипуем отдельным слоем: сама ячейка обязана
                       остаться overflow: visible, иначе ручку ширины срежет
                       по её же краю */}
                   <span className={styles.thLabel}>
-                    {c.sortable ? (
+                    {colRename?.key === c.key ? (
+                      <input
+                        className={styles.colRenameInput}
+                        autoFocus
+                        value={colRename.draft}
+                        onChange={(e) => setColRename({ key: c.key, draft: e.target.value })}
+                        onBlur={() => {
+                          const v = colRename.draft.trim();
+                          if (v && v !== c.label) onColumnRename?.(c.key, v);
+                          setColRename(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+                          else if (e.key === 'Escape') { e.preventDefault(); setColRename(null); }
+                        }}
+                      />
+                    ) : c.sortable ? (
                       <button
                         type="button"
                         className={styles.colHead}
@@ -779,6 +872,50 @@ export default function MindSheet({
                       c.label
                     )}
                   </span>
+
+                  {editableColumns && !colRename && (
+                    <button
+                      type="button"
+                      className={styles.colMenuBtn}
+                      aria-label={`Колонка ${c.label}`}
+                      aria-expanded={colMenu === c.key}
+                      onClick={() => setColMenu(colMenu === c.key ? null : c.key)}
+                    >
+                      ▾
+                    </button>
+                  )}
+                  {colMenu === c.key && (
+                    <div className={styles.colMenuPanel} role="menu">
+                      <button type="button" className={styles.colMenuItem} onClick={() => { setColRename({ key: c.key, draft: c.label }); setColMenu(null); }}>
+                        Переименовать
+                      </button>
+                      <div className={styles.colMenuHead}>Тип</div>
+                      {COLUMN_TYPES.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className={cx(styles.colMenuItem, c.type === t.id && styles.colMenuItemOn)}
+                          onClick={() => doRetype(c.key, t.id)}
+                        >
+                          {t.label}{c.type === t.id ? ' ✓' : ''}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className={cx(styles.colMenuItem, styles.colMenuDanger)}
+                        disabled={gridCols.length <= 1}
+                        onClick={() => {
+                          if (window.confirm(`Удалить колонку «${c.label}»? Её значения из строк будут скрыты.`)) {
+                            onColumnDelete?.(c.key);
+                          }
+                          setColMenu(null);
+                        }}
+                      >
+                        Удалить колонку
+                      </button>
+                    </div>
+                  )}
+
                   <span
                     className={styles.resizer}
                     role="separator"
@@ -791,6 +928,49 @@ export default function MindSheet({
                 </div>
               );
             })}
+            {editableColumns && (
+              <div className={styles.thAdd} role="columnheader">
+                {addingCol ? (
+                  <div className={styles.colAddForm}>
+                    <input
+                      className={styles.colRenameInput}
+                      autoFocus
+                      placeholder="Название"
+                      value={newCol.label}
+                      onChange={(e) => setNewCol((n) => ({ ...n, label: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newCol.label.trim()) {
+                          onColumnAdd?.({ label: newCol.label.trim(), type: newCol.type });
+                          setNewCol({ label: '', type: 'text' }); setAddingCol(false);
+                        } else if (e.key === 'Escape') { setAddingCol(false); }
+                      }}
+                    />
+                    <select
+                      className={styles.colAddType}
+                      value={newCol.type}
+                      onChange={(e) => setNewCol((n) => ({ ...n, type: e.target.value as ColumnType }))}
+                    >
+                      {COLUMN_TYPES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
+                    <button
+                      type="button"
+                      className={styles.colAddOk}
+                      disabled={!newCol.label.trim()}
+                      onClick={() => {
+                        onColumnAdd?.({ label: newCol.label.trim(), type: newCol.type });
+                        setNewCol({ label: '', type: 'text' }); setAddingCol(false);
+                      }}
+                    >
+                      ОК
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" className={styles.colAddBtn} title="Добавить колонку" onClick={() => setAddingCol(true)}>
+                    +
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {loading && records.length === 0 ? (

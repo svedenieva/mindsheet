@@ -110,6 +110,21 @@ export interface MindSheetProps {
       системы — не режимом отображения, а вторым уровнем интерфейса. */
   recordCard?: boolean;
 
+  /** Живое управление колонками прямо из шапки грида: меню ▾ на заголовке
+      (переименовать, сменить тип, удалить), кнопка «+ колонка» и перетаскивание
+      порядка. Опт-ин — хост включает, только если умеет сохранять изменения. */
+  editableColumns?: boolean;
+  /** добавить колонку (label + type) */
+  onColumnAdd?: (col: { label: string; type: ColumnType }) => void;
+  /** переименовать колонку — key стабилен, меняется подпись */
+  onColumnRename?: (key: string, label: string) => void;
+  /** сменить тип колонки */
+  onColumnRetype?: (key: string, type: ColumnType) => void;
+  /** удалить колонку */
+  onColumnDelete?: (key: string) => void;
+  /** новый порядок колонок (полный список ключей грид-колонок) */
+  onColumnsReorder?: (keys: string[]) => void;
+
   /** стартовые настройки вида; дальше их меняет сам пользователь через «Вид» */
   defaultDisplay?: Partial<ViewDisplay>;
   /** когда задан — настройки вида и ширины колонок запоминаются в localStorage
