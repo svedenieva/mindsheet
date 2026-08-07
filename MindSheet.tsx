@@ -261,6 +261,30 @@ export default function MindSheet({
   // строка, раскрытая карточкой сбоку
   const [openRow, setOpenRow] = useState<string | null>(null);
 
+  // карточка ведёт себя как остальные оверлеи: Esc и клик вне закрывают.
+  // Раньше закрыть можно было только крестиком — вразрез с окном дерева и
+  // панелью «Вид», которые закрываются и так.
+  const cardRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!openRow) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenRow(null);
+    };
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      // клик по кнопке раскрытия другой строки не считаем «вне» — иначе
+      // карточка закрылась бы в тот же миг, что открывается новая
+      if (cardRef.current?.contains(t) || t.closest(`.${styles.expand}`)) return;
+      setOpenRow(null);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [openRow]);
+
   // spreadsheet mode: which cell is open, its draft, and the bottom add-row draft
   const [editing, setEditing] = useState<{ id: string; key: string } | null>(null);
   const [draft, setDraft] = useState('');
@@ -902,7 +926,12 @@ export default function MindSheet({
       <div
         key={r.id}
         data-vi={index}
-        className={cx(styles.row, rowsClickable && styles.clickable, freezeClass)}
+        className={cx(
+          styles.row,
+          rowsClickable && styles.clickable,
+          freezeClass,
+          String(r.id) === openRow && styles.rowOpen,
+        )}
         style={freezeVars}
         role={rowsClickable ? "button" : "row"}
         tabIndex={rowsClickable ? 0 : undefined}
@@ -994,7 +1023,7 @@ export default function MindSheet({
   // попадают длинные текстовые колонки, которых в сетке нет вовсе.
   const cardRow = openRow ? records.find((r) => String(r.id) === openRow) : undefined;
   const cardEl = cardRow && (
-    <aside className={styles.card} role="dialog" aria-label="Запись">
+    <aside ref={cardRef} className={styles.card} role="dialog" aria-label="Запись">
       <div className={styles.cardHead}>
         <span className={styles.cardTitle}>
           {String(cardRow[gridCols[0]?.key ?? 'id'] ?? 'Запись')}
