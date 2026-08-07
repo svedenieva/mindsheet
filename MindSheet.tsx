@@ -461,14 +461,9 @@ export default function MindSheet({
     ...(canFavorite ? [STAR_W] : []),
     ...(showRowDelete ? [DEL_W] : []),
   ];
-  const leadCount = leadWidths.length;
-  // прижимаем все лид-ячейки + колонку с названием, поэтому нужен вариант на
-  // единицу больше числа служебных колонок: freeze(leadCount + 1). Раньше
-  // индекс упирался в 3, и при четырёх служебных (ручка+раскрыть+звезда+удалить)
-  // примораживались только они, а само название уезжало вправо.
-  const freezeClass = sizedCols
-    ? [styles.freeze1, styles.freeze2, styles.freeze3, styles.freeze4, styles.freeze5][leadCount]
-    : undefined;
+  // Заморозка колонки с названием отключена по просьбе: при прокрутке вбок
+  // название больше не прилипает слева, и нет тени-«фейда» на его правом крае.
+  const freezeClass = undefined;
   const freezeVars: CSSProperties = {};
   let leadAcc = 0;
   leadWidths.forEach((w, i) => {

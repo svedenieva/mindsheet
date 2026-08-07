@@ -32,12 +32,12 @@
 }
 
 .select {
-  padding: 4px 8px;
+  padding: 3px 7px;
   background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--ink);
   cursor: pointer;
 }
@@ -48,15 +48,15 @@
 }
 
 .search {
-  flex: 0 1 200px;
-  min-width: 140px;
-  max-width: 240px;
-  padding: 5px 10px;
+  flex: 0 1 170px;
+  min-width: 120px;
+  max-width: 200px;
+  padding: 4px 9px;
   background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--ink);
 }
 
@@ -68,18 +68,18 @@
 .count {
   margin-left: auto;
   font-family: var(--font-mono), monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--ink-25);
 }
 
 /* clears the active filter + search in one click; only shown when active */
 .reset {
-  padding: 4px 10px;
+  padding: 3px 8px;
   background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--ink-45);
   cursor: pointer;
 }
@@ -92,7 +92,7 @@
 /* ── left-sidebar layout (filtersPosition="left", Fathom-style) ───────── */
 .withSidebar {
   display: flex;
-  gap: 20px;
+  gap: 14px;
   /* stretch so the table area gets a bounded height and scrolls INSIDE the
      card — that keeps the filter sidebar and the sticky column header in
      place while the rows scroll (instead of the whole page scrolling). */
@@ -109,12 +109,12 @@
 
 .sidebar {
   flex: none;
-  width: 210px;
+  width: 176px;
   display: flex;
   flex-direction: column;
   /* tight vertical rhythm so all the filters fit inside the card's height
      without scrolling */
-  gap: 8px;
+  gap: 5px;
   /* stretch down to the bottom of the table card so the filter column lines
      up with the cards. This only sets the column's height — it doesn't touch
      the table's width/height, so the cards keep their space. Filters sit at
@@ -125,7 +125,7 @@
 
 .sideHead {
   font-family: var(--font-mono), monospace;
-  font-size: 9.5px;
+  font-size: 9px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--ink-25);
@@ -135,11 +135,11 @@
 .sideFilter {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .sideFilterLabel {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--ink-45);
 }
 
@@ -149,12 +149,12 @@
   width: 100%;
   min-width: 0;
   max-width: none;
-  padding: 6px 11px;
+  padding: 4px 9px;
 }
 
 .sidebar .select {
   width: 100%;
-  padding: 4px 9px;
+  padding: 3px 7px;
 }
 
 .sidebar .count {
@@ -226,8 +226,8 @@
   z-index: 5;
   display: grid;
   grid-template-columns: var(--grid);
-  gap: 10px;
-  padding: 11px 20px;
+  gap: 8px;
+  padding: 8px 14px;
   background: light-dark(#fbfaf8, #171c20);
   border-bottom: 1px solid var(--rule);
   /* мягкая тень снизу — когда строки уезжают под шапку, видно, что она
@@ -370,9 +370,9 @@
 .row {
   display: grid;
   grid-template-columns: var(--grid);
-  gap: 10px;
+  gap: 8px;
   align-items: start;
-  padding: 13px 20px;
+  padding: 8px 14px;
   border-top: 1px solid var(--rule);
   transition: background-color 0.12s ease;
 }
@@ -414,8 +414,8 @@
 
 .td {
   min-width: 0;
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 11.5px;
+  line-height: 1.4;
   color: var(--ink-70);
 }
 
@@ -573,16 +573,16 @@
 /* ── spreadsheet (editable) mode ─────────────────────────────────
    dense rows so ~50 fit on screen, click-to-edit cells, add-row line */
 .compact .tableHead {
-  padding: 7px 14px;
+  padding: 6px 12px;
 }
 .compact .row {
-  padding: 0 14px;
+  padding: 0 12px;
   align-items: stretch;
 }
 .compact .td {
-  font-size: 12.5px;
+  font-size: 11.5px;
   line-height: 1.3;
-  padding: 5px 0;
+  padding: 4px 0;
   align-self: center;
 }
 
@@ -761,8 +761,8 @@
 .favOnly {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 5px;
+  font-size: 11px;
   color: var(--ink-70);
   cursor: pointer;
   white-space: nowrap;
@@ -776,12 +776,12 @@
 }
 
 .viewBtn {
-  padding: 4px 10px;
+  padding: 3px 8px;
   background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--ink-45);
   cursor: pointer;
   white-space: nowrap;
