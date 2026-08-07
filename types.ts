@@ -142,4 +142,73 @@ export interface MindSheetProps {
   onRowReorder?: (orderedIds: string[]) => void;
   /** удалить строку: показывает контрол удаления в строке (только в editable) */
   onDeleteRow?: (record: Row) => void;
+
+  /** Надписи интерфейса таблицы. Опциональны: не переданные берутся из русских
+      значений по умолчанию, поэтому существующие хосты (Fathom) ничего не
+      замечают. Хост, у которого есть переключатель языков, передаёт сюда набор
+      на выбранном языке. */
+  strings?: Partial<MindSheetStrings>;
+}
+
+/** Все надписи таблицы, которые видит пользователь. Строки с подстановкой —
+    функции. Значения по умолчанию (русские) лежат в DEFAULT_STRINGS. */
+export interface MindSheetStrings {
+  searchPlaceholder: string;
+  searchAria: string;
+  filterAll: string;
+  filterAria: (label: string) => string;
+  filtersHead: string;
+  favoritesOnly: string;
+  addToFav: string;
+  removeFromFav: string;
+  reset: string;
+  clearSort: string;
+  shownOf: (shown: number, total: number) => string;
+  countRecords: (total: number) => string;
+  viewButton: string;
+  viewButtonTitle: string;
+  viewDialogAria: string;
+  wrapHead: string;
+  wrapWrap: string; wrapWrapHint: string;
+  wrapClip: string; wrapClipHint: string;
+  wrapOverflow: string; wrapOverflowHint: string;
+  wrapShrink: string; wrapShrinkHint: string;
+  rowHeightHead: string;
+  rowLinesAll: string;
+  rowHeightNote: string;
+  aggFold: string;
+  aggNote: string;
+  aggNone: string; aggSum: string; aggAvg: string; aggMin: string; aggMax: string; aggFilled: string; aggUnique: string;
+  filledOf: (filled: number, total: number) => string;
+  autoWidthLink: string;
+  widthNote: string;
+  sortHeaderTitle: string;
+  colMenuAria: (label: string) => string;
+  rename: string;
+  typeHead: string;
+  typeText: string; typeNumber: string; typeSelect: string; typeUrl: string; typeLongText: string;
+  widthHead: string;
+  fitContent: string;
+  resetWidth: string;
+  deleteColumn: string;
+  deleteColumnConfirm: (label: string) => string;
+  retypeNumberConfirm: (n: number) => string;
+  resizerAria: (label: string) => string;
+  resizerTitle: string;
+  addColNamePlaceholder: string;
+  addColumnAria: string;
+  nothingFound: string;
+  expandAll: string; collapseAll: string;
+  expandGroup: string; collapseGroup: string;
+  dragRow: string;
+  expandRecord: string;
+  deleteRow: string;
+  recordAria: string;
+  close: string;
+  openAsPage: string;
+  ok: string;
+  groupingBy: (label: string, count: number) => string;
+  groupingHint: string;
+  clearFilter: string;
+  filterByValue: (value: string) => string;
 }

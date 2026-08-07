@@ -1,41 +1,82 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
-import type { AggKind, ColumnDef, ColumnType, MindSheetProps, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
+import type { AggKind, ColumnDef, ColumnType, MindSheetProps, MindSheetStrings, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
 import styles from './MindSheet.module.css';
 
-// Примочки из табличных систем, которые задокументированы у вендоров:
-// Google Sheets — WrapStrategy и правило соседней ячейки; Coda — высота строки
-// 1/2/3/All lines и её жёсткая связь с переносом; Excel/Sheets — тяга колонки
-// за границу заголовка и двойной клик для сброса ширины.
-const WRAP_MODES: Array<{ id: WrapStrategy; label: string; hint: string }> = [
-  { id: 'wrap', label: 'Переносить', hint: 'ячейка растягивается под весь объём текста' },
-  { id: 'clip', label: 'Обрезать', hint: 'одна строка, лишнее срезается по границе' },
-  { id: 'overflow', label: 'За границу', hint: 'текст уходит под соседнюю ячейку, если она пустая' },
-  { id: 'shrink', label: 'Сжать', hint: 'шрифт уменьшается под ширину; что не влезло и в 8px — обрезается' },
-];
-
-// Итоги по группам — набор из group-by views Google Таблиц.
-const AGG_MODES: Array<{ id: AggKind; label: string; numeric: boolean }> = [
-  { id: 'none', label: '—', numeric: false },
-  { id: 'sum', label: 'сумма', numeric: true },
-  { id: 'avg', label: 'среднее', numeric: true },
-  { id: 'min', label: 'мин', numeric: true },
-  { id: 'max', label: 'макс', numeric: true },
-  { id: 'filled', label: 'заполнено', numeric: false },
-  { id: 'unique', label: 'уникальных', numeric: false },
-];
+// Надписи по умолчанию — русские. Хост может переопределить любую через проп
+// strings; не переданные берутся отсюда, поэтому старые хосты не меняются.
+export const DEFAULT_STRINGS: MindSheetStrings = {
+  searchPlaceholder: 'Поиск…',
+  searchAria: 'Поиск',
+  filterAll: 'Все',
+  filterAria: (label) => `Фильтр ${label}`,
+  filtersHead: 'Фильтры',
+  favoritesOnly: 'Только избранные',
+  addToFav: 'В избранное',
+  removeFromFav: 'Убрать из избранного',
+  reset: 'Сбросить',
+  clearSort: 'Убрать сортировку',
+  shownOf: (shown, total) => `показано ${shown} из ${total}`,
+  countRecords: (total) => `${total} записей`,
+  viewButton: 'Вид',
+  viewButtonTitle: 'Как показывать текст в ячейках',
+  viewDialogAria: 'Вид таблицы',
+  wrapHead: 'Текст не влез в ячейку',
+  wrapWrap: 'Переносить', wrapWrapHint: 'ячейка растягивается под весь объём текста',
+  wrapClip: 'Обрезать', wrapClipHint: 'одна строка, лишнее срезается по границе',
+  wrapOverflow: 'За границу', wrapOverflowHint: 'текст уходит под соседнюю ячейку, если она пустая',
+  wrapShrink: 'Сжать', wrapShrinkHint: 'шрифт уменьшается под ширину; что не влезло и в 8px — обрезается',
+  rowHeightHead: 'Высота строки',
+  rowLinesAll: 'Всё',
+  rowHeightNote: 'Высота работает только с переносом — без него строка всегда одна.',
+  aggFold: 'Итоги по группам',
+  aggNote: 'Считается по всей ветке, включая вложенные группы.',
+  aggNone: '—', aggSum: 'сумма', aggAvg: 'среднее', aggMin: 'мин', aggMax: 'макс', aggFilled: 'заполнено', aggUnique: 'уникальных',
+  filledOf: (filled, total) => `${filled} из ${total}`,
+  autoWidthLink: 'Вернуть авто-ширину колонок',
+  widthNote: 'Ширина колонки — тяни за границу заголовка.',
+  sortHeaderTitle: 'Клик — сортировать; Shift + клик — добавить уровень группировки',
+  colMenuAria: (label) => `Колонка ${label}`,
+  rename: 'Переименовать',
+  typeHead: 'Тип',
+  typeText: 'Текст', typeNumber: 'Число', typeSelect: 'Выбор', typeUrl: 'Ссылка', typeLongText: 'Длинный текст',
+  widthHead: 'Ширина',
+  fitContent: 'По содержимому',
+  resetWidth: 'Сбросить ширину',
+  deleteColumn: 'Удалить колонку',
+  deleteColumnConfirm: (label) => `Удалить колонку «${label}»? Её значения из строк будут скрыты.`,
+  retypeNumberConfirm: (n) => `${n} значений не станут числом — они останутся как есть, но сортировка и итоги их не учтут. Сменить тип?`,
+  resizerAria: (label) => `Ширина колонки ${label}`,
+  resizerTitle: 'Потяни, чтобы изменить ширину колонки',
+  addColNamePlaceholder: 'Название',
+  addColumnAria: 'Добавить колонку',
+  nothingFound: 'Ничего не найдено',
+  expandAll: 'Развернуть все', collapseAll: 'Свернуть все',
+  expandGroup: 'Развернуть', collapseGroup: 'Свернуть',
+  dragRow: 'Перетащить строку',
+  expandRecord: 'Раскрыть запись',
+  deleteRow: 'Удалить строку',
+  recordAria: 'Запись',
+  close: 'Закрыть',
+  openAsPage: 'Открыть страницей →',
+  ok: 'ОК',
+  groupingBy: (label, count) => `группировка: ${label} · ${count}`,
+  groupingHint: 'Shift + клик по заголовку — добавить уровень',
+  clearFilter: 'Убрать фильтр',
+  filterByValue: (value) => `Фильтр: ${value}`,
+};
 
 // Ниже этого размера сжимать бессмысленно — дальше уже не читается,
 // поэтому остаток честно обрезаем.
 const MIN_SHRINK_PX = 8;
 
-function aggregate(rows: Row[], key: string, kind: AggKind): string | null {
+function aggregate(rows: Row[], key: string, kind: AggKind, s: MindSheetStrings): string | null {
   if (kind === 'none' || rows.length === 0) return null;
   const values = rows.map((r) => r[key]);
   const filled = values.filter(hasValue);
 
-  if (kind === 'filled') return `${filled.length} из ${rows.length}`;
+  if (kind === 'filled') return s.filledOf(filled.length, rows.length);
   if (kind === 'unique') return String(new Set(filled.map((v) => String(v))).size);
 
   const nums = filled.map((v) => Number(String(v).replace(',', '.'))).filter((n) => Number.isFinite(n));
@@ -47,23 +88,7 @@ function aggregate(rows: Row[], key: string, kind: AggKind): string | null {
   return round(Math.max(...nums));
 }
 
-const LINE_MODES: Array<{ id: RowLines; label: string }> = [
-  { id: 1, label: '1' },
-  { id: 2, label: '2' },
-  { id: 3, label: '3' },
-  { id: 'all', label: 'Всё' },
-];
-
 const MIN_COL_WIDTH = 64;
-
-// типы колонок для меню и формы добавления — те же, что принимает бэкенд
-const COLUMN_TYPES: Array<{ id: ColumnType; label: string }> = [
-  { id: 'text', label: 'Текст' },
-  { id: 'number', label: 'Число' },
-  { id: 'select', label: 'Выбор' },
-  { id: 'url', label: 'Ссылка' },
-  { id: 'long-text', label: 'Длинный текст' },
-];
 
 // ширина хвостового трека под кнопку «+ колонка»
 const ADD_COL_TRACK = 40;
@@ -122,8 +147,33 @@ export default function MindSheet({
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
   editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnsReorder,
-  defaultDisplay, viewKey,
+  defaultDisplay, viewKey, strings,
 }: MindSheetProps) {
+  // надписи: переданные хостом поверх русских значений по умолчанию
+  const S: MindSheetStrings = { ...DEFAULT_STRINGS, ...strings };
+  // наборы для «Вида», высоты строки, итогов и типов колонок — на текущем языке
+  const WRAP_MODES: Array<{ id: WrapStrategy; label: string; hint: string }> = [
+    { id: 'wrap', label: S.wrapWrap, hint: S.wrapWrapHint },
+    { id: 'clip', label: S.wrapClip, hint: S.wrapClipHint },
+    { id: 'overflow', label: S.wrapOverflow, hint: S.wrapOverflowHint },
+    { id: 'shrink', label: S.wrapShrink, hint: S.wrapShrinkHint },
+  ];
+  const LINE_MODES: Array<{ id: RowLines; label: string }> = [
+    { id: 1, label: '1' }, { id: 2, label: '2' }, { id: 3, label: '3' }, { id: 'all', label: S.rowLinesAll },
+  ];
+  const AGG_MODES: Array<{ id: AggKind; label: string; numeric: boolean }> = [
+    { id: 'none', label: S.aggNone, numeric: false },
+    { id: 'sum', label: S.aggSum, numeric: true },
+    { id: 'avg', label: S.aggAvg, numeric: true },
+    { id: 'min', label: S.aggMin, numeric: true },
+    { id: 'max', label: S.aggMax, numeric: true },
+    { id: 'filled', label: S.aggFilled, numeric: false },
+    { id: 'unique', label: S.aggUnique, numeric: false },
+  ];
+  const COLUMN_TYPES: Array<{ id: ColumnType; label: string }> = [
+    { id: 'text', label: S.typeText }, { id: 'number', label: S.typeNumber }, { id: 'select', label: S.typeSelect },
+    { id: 'url', label: S.typeUrl }, { id: 'long-text', label: S.typeLongText },
+  ];
   const favSet = new Set(favorites ?? []);
   const canFavorite = Boolean(onToggleFavorite);
   // опт-ин контрол удаления строки — виден только в editable-режиме, когда
@@ -325,7 +375,7 @@ export default function MindSheet({
   const doRetype = (key: string, type: ColumnType) => {
     if (type === 'number') {
       const bad = lossToNumber(key);
-      if (bad > 0 && !window.confirm(`${bad} значений не станут числом — они останутся как есть, но сортировка и итоги их не учтут. Сменить тип?`)) {
+      if (bad > 0 && !window.confirm(S.retypeNumberConfirm(bad))) {
         return;
       }
     }
@@ -696,8 +746,8 @@ export default function MindSheet({
     <input
       type="search"
       className={styles.search}
-      aria-label="Поиск"
-      placeholder="Поиск…"
+      aria-label={S.searchAria}
+      placeholder={S.searchPlaceholder}
       value={search ?? ''}
       onChange={(e) => onSearchChange(e.target.value)}
     />
@@ -708,11 +758,11 @@ export default function MindSheet({
       {sidebar ? <span className={styles.sideFilterLabel}>{c.label}</span> : `${c.label}:`}
       <select
         className={styles.select}
-        aria-label={`Фильтр ${c.label}`}
+        aria-label={S.filterAria(c.label)}
         value={filterMap[c.key] ?? ''}
         onChange={(e) => setFilter(c.key, e.target.value)}
       >
-        <option value="">Все</option>
+        <option value="">{S.filterAll}</option>
         {(filterOptions?.[c.key] ?? distinct(records, c.key)).map((v) => (
           <option key={v} value={v}>{v}</option>
         ))}
@@ -722,7 +772,7 @@ export default function MindSheet({
 
   const resetEl = isFiltered && (
     <button type="button" className={styles.reset} onClick={resetAll}>
-      Сбросить
+      {S.reset}
     </button>
   );
 
@@ -734,13 +784,13 @@ export default function MindSheet({
         checked={Boolean(favoritesOnly)}
         onChange={(e) => onFavoritesOnlyChange(e.target.checked)}
       />
-      ★ Только избранные
+      ★ {S.favoritesOnly}
     </label>
   );
 
   const sortResetEl = onSortReset && levels.length > 0 && (
     <button type="button" className={styles.reset} onClick={onSortReset}>
-      Убрать сортировку
+      {S.clearSort}
     </button>
   );
 
@@ -753,9 +803,9 @@ export default function MindSheet({
         className={styles.viewBtn}
         aria-expanded={viewOpen}
         onClick={() => setViewOpen((o) => !o)}
-        title="Как показывать текст в ячейках"
+        title={S.viewButtonTitle}
       >
-        ▤ Вид
+        ▤ {S.viewButton}
       </button>
       {viewOpen && (
         <>
@@ -763,12 +813,12 @@ export default function MindSheet({
           <div
             className={styles.viewPanel}
             role="dialog"
-            aria-label="Вид таблицы"
+            aria-label={S.viewDialogAria}
             onKeyDown={(e) => {
               if (e.key === 'Escape') setViewOpen(false);
             }}
           >
-            <div className={styles.viewHead}>Текст не влез в ячейку</div>
+            <div className={styles.viewHead}>{S.wrapHead}</div>
             {WRAP_MODES.map((m) => (
               <button
                 key={m.id}
@@ -781,7 +831,7 @@ export default function MindSheet({
               </button>
             ))}
 
-            <div className={styles.viewHead}>Высота строки</div>
+            <div className={styles.viewHead}>{S.rowHeightHead}</div>
             <div className={styles.viewRow}>
               {LINE_MODES.map((m) => (
                 <button
@@ -796,7 +846,7 @@ export default function MindSheet({
               ))}
             </div>
             {display.wrap !== 'wrap' && (
-              <div className={styles.viewNote}>Высота работает только с переносом — без него строка всегда одна.</div>
+              <div className={styles.viewNote}>{S.rowHeightNote}</div>
             )}
 
             {autoGroup && (
@@ -810,7 +860,7 @@ export default function MindSheet({
                   onClick={() => setAggOpen((o) => !o)}
                 >
                   <span className={styles.viewFoldCaret} aria-hidden="true">{aggOpen ? '▾' : '▸'}</span>
-                  Итоги по группам
+                  {S.aggFold}
                   {aggCount > 0 && <span className={styles.viewFoldCount}>{aggCount}</span>}
                 </button>
                 {aggOpen && gridCols.map((c) => (
@@ -828,17 +878,17 @@ export default function MindSheet({
                   </label>
                 ))}
                 {aggOpen && (
-                  <div className={styles.viewNote}>Считается по всей ветке, включая вложенные группы.</div>
+                  <div className={styles.viewNote}>{S.aggNote}</div>
                 )}
               </>
             )}
 
             {sizedCols && (
               <button type="button" className={styles.viewLink} onClick={resetWidths}>
-                Вернуть авто-ширину колонок
+                {S.autoWidthLink}
               </button>
             )}
-            <div className={styles.viewNote}>Ширина колонки — тяни за границу заголовка.</div>
+            <div className={styles.viewNote}>{S.widthNote}</div>
           </div>
         </>
       )}
@@ -847,7 +897,7 @@ export default function MindSheet({
 
   const countEl = (
     <span className={styles.count}>
-      {isFiltered ? `показано ${records.length} из ${grandTotal}` : `${grandTotal} записей`}
+      {isFiltered ? S.shownOf(records.length, grandTotal) : S.countRecords(grandTotal)}
     </span>
   );
 
@@ -918,7 +968,7 @@ export default function MindSheet({
                             ? onSortsChange(c.key, e.shiftKey || e.ctrlKey || e.metaKey)
                             : onSortChange(c.key)
                         }
-                        title="Клик — сортировать; Shift + клик — добавить уровень группировки"
+                        title={S.sortHeaderTitle}
                       >
                         {c.label}
                         <span className={styles.arrow}>
@@ -937,7 +987,7 @@ export default function MindSheet({
                     <button
                       type="button"
                       className={styles.colMenuBtn}
-                      aria-label={`Колонка ${c.label}`}
+                      aria-label={S.colMenuAria(c.label)}
                       aria-expanded={colMenu === c.key}
                       onClick={() => setColMenu(colMenu === c.key ? null : c.key)}
                     >
@@ -947,9 +997,9 @@ export default function MindSheet({
                   {colMenu === c.key && (
                     <div className={styles.colMenuPanel} role="menu">
                       <button type="button" className={styles.colMenuItem} onClick={() => { setColRename({ key: c.key, draft: c.label }); setColMenu(null); }}>
-                        Переименовать
+                        {S.rename}
                       </button>
-                      <div className={styles.colMenuHead}>Тип</div>
+                      <div className={styles.colMenuHead}>{S.typeHead}</div>
                       {COLUMN_TYPES.map((t) => (
                         <button
                           key={t.id}
@@ -960,13 +1010,13 @@ export default function MindSheet({
                           {t.label}{c.type === t.id ? ' ✓' : ''}
                         </button>
                       ))}
-                      <div className={styles.colMenuHead}>Ширина</div>
+                      <div className={styles.colMenuHead}>{S.widthHead}</div>
                       <button type="button" className={styles.colMenuItem} onClick={() => { fitWidth(c.key, ci); setColMenu(null); }}>
-                        По содержимому
+                        {S.fitContent}
                       </button>
                       {display.widths[c.key] && (
                         <button type="button" className={styles.colMenuItem} onClick={() => { resetWidth(c.key); setColMenu(null); }}>
-                          Сбросить ширину
+                          {S.resetWidth}
                         </button>
                       )}
                       <button
@@ -974,13 +1024,13 @@ export default function MindSheet({
                         className={cx(styles.colMenuItem, styles.colMenuDanger)}
                         disabled={gridCols.length <= 1}
                         onClick={() => {
-                          if (window.confirm(`Удалить колонку «${c.label}»? Её значения из строк будут скрыты.`)) {
+                          if (window.confirm(S.deleteColumnConfirm(c.label))) {
                             onColumnDelete?.(c.key);
                           }
                           setColMenu(null);
                         }}
                       >
-                        Удалить колонку
+                        {S.deleteColumn}
                       </button>
                     </div>
                   )}
@@ -989,8 +1039,8 @@ export default function MindSheet({
                     className={styles.resizer}
                     role="separator"
                     aria-orientation="vertical"
-                    aria-label={`Ширина колонки ${c.label}`}
-                    title="Потяни, чтобы изменить ширину колонки"
+                    aria-label={S.resizerAria(c.label)}
+                    title={S.resizerTitle}
                     onPointerDown={(e) => startResize(e, c.key)}
                   />
                 </div>
@@ -1003,7 +1053,7 @@ export default function MindSheet({
                     <input
                       className={styles.colRenameInput}
                       autoFocus
-                      placeholder="Название"
+                      placeholder={S.addColNamePlaceholder}
                       value={newCol.label}
                       onChange={(e) => setNewCol((n) => ({ ...n, label: e.target.value }))}
                       onKeyDown={(e) => {
@@ -1029,11 +1079,11 @@ export default function MindSheet({
                         setNewCol({ label: '', type: 'text' }); setAddingCol(false);
                       }}
                     >
-                      ОК
+                      {S.ok}
                     </button>
                   </div>
                 ) : (
-                  <button type="button" className={styles.colAddBtn} title="Добавить колонку" onClick={() => setAddingCol(true)}>
+                  <button type="button" className={styles.colAddBtn} title={S.addColumnAria} onClick={() => setAddingCol(true)}>
                     +
                   </button>
                 )}
@@ -1056,7 +1106,7 @@ export default function MindSheet({
               </div>
             ))
           ) : records.length === 0 ? (
-            <div className={styles.none}>Ничего не найдено</div>
+            <div className={styles.none}>{S.nothingFound}</div>
           ) : (
             <>
             {grouped && (
@@ -1066,14 +1116,14 @@ export default function MindSheet({
                   className={styles.groupBarBtn}
                   onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(allPaths))}
                 >
-                  {allCollapsed ? 'Развернуть все' : 'Свернуть все'}
+                  {allCollapsed ? S.expandAll : S.collapseAll}
                 </button>
                 <span className={styles.groupBarInfo}>
-                  группировка: {levelsLabel} · {groups.length}
+                  {S.groupingBy(levelsLabel, groups.length)}
                 </span>
                 {levels.length < 3 && (
                   <span className={styles.groupBarHint}>
-                    Shift + клик по заголовку — добавить уровень
+                    {S.groupingHint}
                   </span>
                 )}
               </div>
@@ -1138,7 +1188,7 @@ export default function MindSheet({
       ? aggKeys
           .map((key) => {
             const col = columns.find((c) => c.key === key);
-            const value = aggregate(rowsOf(g), key, display.aggregates[key]);
+            const value = aggregate(rowsOf(g), key, display.aggregates[key], S);
             return value === null ? null : { label: col?.label ?? key, value };
           })
           .filter(Boolean)
@@ -1156,7 +1206,7 @@ export default function MindSheet({
             className={styles.groupToggle}
             onClick={() => toggleGroup(g.path)}
             aria-expanded={!isCollapsed}
-            title={isCollapsed ? 'Развернуть' : 'Свернуть'}
+            title={isCollapsed ? S.expandGroup : S.collapseGroup}
           >
             {isCollapsed ? '+' : '−'}
           </button>
@@ -1247,8 +1297,8 @@ export default function MindSheet({
             <span
               className={styles.dragHandle}
               draggable
-              title="Перетащить строку"
-              aria-label="Перетащить строку"
+              title={S.dragRow}
+              aria-label={S.dragRow}
               onDragStart={(e) => {
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', String(r.id));
@@ -1267,7 +1317,7 @@ export default function MindSheet({
             <button
               type="button"
               className={styles.expand}
-              title="Раскрыть запись"
+              title={S.expandRecord}
               onClick={(e) => {
                 e.stopPropagation();
                 setOpenRow(r.id);
@@ -1285,7 +1335,7 @@ export default function MindSheet({
             <button
               type="button"
               className={cx(styles.star, favSet.has(r.id) && styles.starOn)}
-              title={favSet.has(r.id) ? 'Убрать из избранного' : 'В избранное'}
+              title={favSet.has(r.id) ? S.removeFromFav : S.addToFav}
               aria-pressed={favSet.has(r.id)}
               onClick={(e) => {
                 e.stopPropagation();
@@ -1302,8 +1352,8 @@ export default function MindSheet({
             <button
               type="button"
               className={styles.rowDelete}
-              title="Удалить строку"
-              aria-label="Удалить строку"
+              title={S.deleteRow}
+              aria-label={S.deleteRow}
               onClick={(e) => {
                 e.stopPropagation();
                 onDeleteRow(r);
@@ -1340,7 +1390,7 @@ export default function MindSheet({
                 : renderCell(r[c.key], c, search, {
                     activeValue: filterMap[c.key],
                     onFilter: toggleFilter,
-                  })}
+                  }, S)}
             </div>
           );
         })}
@@ -1354,12 +1404,12 @@ export default function MindSheet({
   // попадают длинные текстовые колонки, которых в сетке нет вовсе.
   const cardRow = openRow ? records.find((r) => String(r.id) === openRow) : undefined;
   const cardEl = cardRow && (
-    <aside ref={cardRef} className={styles.card} role="dialog" aria-label="Запись">
+    <aside ref={cardRef} className={styles.card} role="dialog" aria-label={S.recordAria}>
       <div className={styles.cardHead}>
         <span className={styles.cardTitle}>
-          {String(cardRow[gridCols[0]?.key ?? 'id'] ?? 'Запись')}
+          {String(cardRow[gridCols[0]?.key ?? 'id'] ?? S.recordAria)}
         </span>
-        <button type="button" className={styles.cardClose} onClick={() => setOpenRow(null)} aria-label="Закрыть">
+        <button type="button" className={styles.cardClose} onClick={() => setOpenRow(null)} aria-label={S.close}>
           ×
         </button>
       </div>
@@ -1391,7 +1441,7 @@ export default function MindSheet({
       </div>
       {onRowOpen && (
         <button type="button" className={styles.cardOpen} onClick={() => onRowOpen(cardRow)}>
-          Открыть страницей →
+          {S.openAsPage}
         </button>
       )}
     </aside>
@@ -1403,7 +1453,7 @@ export default function MindSheet({
         <div className={styles.withSidebar}>
           <aside className={styles.sidebar}>
             {searchEl}
-            {filterables.length > 0 && <div className={styles.sideHead}>Фильтры</div>}
+            {filterables.length > 0 && <div className={styles.sideHead}>{S.filtersHead}</div>}
             {filterEls}
             {favEl}
             {displayEl}
@@ -1442,7 +1492,7 @@ interface BadgeCtx {
   onFilter?: (key: string, value: string) => void;
 }
 
-function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: BadgeCtx) {
+function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: BadgeCtx, s: MindSheetStrings = DEFAULT_STRINGS) {
   if (!hasValue(value)) {
     return <span className={styles.empty}>—</span>;
   }
@@ -1470,7 +1520,7 @@ function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: 
         <button
           type="button"
           className={cx(cls, styles.badgeBtn, active && styles.badgeActive)}
-          title={active ? 'Убрать фильтр' : `Фильтр: ${String(value)}`}
+          title={active ? s.clearFilter : s.filterByValue(String(value))}
           onClick={(e) => {
             e.stopPropagation();
             badge.onFilter!(col.key, String(value));
