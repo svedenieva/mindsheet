@@ -364,14 +364,16 @@
   color: var(--sage);
 }
 
-/* one row — hairline on top, not bottom; no radius (the card has it) */
+/* one row — hairline on top, not bottom; no radius (the card has it).
+   Линия строки в тон вертикальным разделителям (var(--rule)) — вместе
+   получается цельная сетка, как в таблице/Excel. */
 .row {
   display: grid;
   grid-template-columns: var(--grid);
   gap: 10px;
   align-items: start;
   padding: 13px 20px;
-  border-top: 1px solid var(--rule-soft);
+  border-top: 1px solid var(--rule);
   transition: background-color 0.12s ease;
 }
 
