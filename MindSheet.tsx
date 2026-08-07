@@ -451,7 +451,7 @@ export default function MindSheet({
   // любой комбинации, а не только «есть обе» / «есть одна».
   const HANDLE_W = 22;
   const CARET_W = 22;
-  const STAR_W = 24;
+  const STAR_W = 18;
   const DEL_W = 20;
   const GAP = 10;
   // ручка перетаскивания идёт самой левой лид-ячейкой — до caret/star/delete
@@ -478,7 +478,7 @@ export default function MindSheet({
   const grid = [
     ...(canReorderRows ? [`${HANDLE_W}px`] : []),
     lead,
-    ...(canFavorite ? ['24px'] : []),
+    ...(canFavorite ? [`${STAR_W}px`] : []),
     ...(showRowDelete ? [`${DEL_W}px`] : []),
     ...gridCols.map((c, i) => (display.widths[c.key] ? `${display.widths[c.key]}px` : trackFor(c, i === 0))),
     // хвостовой трек под «+ колонка»; строки его просто оставляют пустым
@@ -862,7 +862,7 @@ export default function MindSheet({
           <div className={cx(styles.tableHead, freezeClass)} style={freezeVars} role="row">
             {canReorderRows && <div className={styles.caretCell} aria-hidden="true" />}
             <div className={styles.caretCell} aria-hidden="true" />
-            {canFavorite && <div className={styles.caretCell} aria-hidden="true">★</div>}
+            {canFavorite && <div className={styles.caretCell} aria-hidden="true" />}
             {showRowDelete && <div className={styles.caretCell} aria-hidden="true" />}
             {gridCols.map((c, ci) => {
               const levelIdx = levels.findIndex((l) => l.key === c.key);
