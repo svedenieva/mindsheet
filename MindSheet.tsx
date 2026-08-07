@@ -247,33 +247,35 @@ export default function MindSheet({
     window.addEventListener('pointercancel', up);
   };
 
-  // Двойной клик по границе — «Fit to data» из Google Таблиц: ширина по
-  // содержимому, а не возврат к резиновому треку. Меряем видимые ячейки
-  // колонки: остальных в DOM всё равно нет, а Google и сам подгоняет по тому,
-  // что показано. Второй двойной клик подряд снимает ширину совсем.
-  const autoWidth = (key: string, index: number) => {
+  // «Ширина по содержимому» (Fit to data из Google Таблиц) — теперь ЯВНЫМ
+  // пунктом меню колонки, а не двойным кликом по краю: авто-раздувание на
+  // случайный двойной клик по ручке путало и мешало тянуть ширину руками.
+  // Ячейки ищем по классу .td/.th, а не по позиции: служебных колонок слева
+  // бывает разное число (ручка перетаскивания, раскрытие, звезда, корзина),
+  // и счёт по индексу промахивался мимо нужной колонки.
+  const fitWidth = (key: string, index: number) => {
     const root = tableRef.current;
-    if (!root || display.widths[key]) {
-      setDisplay((d) => {
-        const widths = { ...d.widths };
-        delete widths[key];
-        return { ...d, widths };
-      });
-      return;
-    }
-    const lead = (rowsClickable || editable ? 1 : 0) + (canFavorite ? 1 : 0) + (showRowDelete ? 1 : 0);
+    if (!root) return;
     let need = 0;
     for (const row of root.querySelectorAll<HTMLElement>(`.${styles.row}`)) {
-      const cell = row.children[lead + index] as HTMLElement | undefined;
+      const cell = row.querySelectorAll<HTMLElement>(`.${styles.td}`)[index];
       if (cell) need = Math.max(need, cell.scrollWidth);
     }
-    const head = root.querySelector<HTMLElement>(`.${styles.tableHead}`)?.children[lead + index] as HTMLElement | undefined;
-    if (head) need = Math.max(need, head.scrollWidth);
+    const headCell = root.querySelector<HTMLElement>(`.${styles.tableHead}`)?.querySelectorAll<HTMLElement>(`.${styles.th}`)[index];
+    if (headCell) need = Math.max(need, headCell.scrollWidth);
     if (!need) return;
     // немного воздуха, чтобы текст не упирался в границу
     const width = Math.min(520, Math.max(MIN_COL_WIDTH, Math.ceil(need) + 12));
     setDisplay((d) => ({ ...d, widths: { ...d.widths, [key]: width } }));
   };
+
+  // снять ручную ширину — колонка возвращается к резиновому треку
+  const resetWidth = (key: string) =>
+    setDisplay((d) => {
+      const widths = { ...d.widths };
+      delete widths[key];
+      return { ...d, widths };
+    });
 
   // строка, раскрытая карточкой сбоку
   const [openRow, setOpenRow] = useState<string | null>(null);
@@ -960,6 +962,15 @@ export default function MindSheet({
                           {t.label}{c.type === t.id ? ' ✓' : ''}
                         </button>
                       ))}
+                      <div className={styles.colMenuHead}>Ширина</div>
+                      <button type="button" className={styles.colMenuItem} onClick={() => { fitWidth(c.key, ci); setColMenu(null); }}>
+                        По содержимому
+                      </button>
+                      {display.widths[c.key] && (
+                        <button type="button" className={styles.colMenuItem} onClick={() => { resetWidth(c.key); setColMenu(null); }}>
+                          Сбросить ширину
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={cx(styles.colMenuItem, styles.colMenuDanger)}
@@ -981,9 +992,8 @@ export default function MindSheet({
                     role="separator"
                     aria-orientation="vertical"
                     aria-label={`Ширина колонки ${c.label}`}
-                    title="Тяни — ширина колонки; двойной клик — подогнать по содержимому"
+                    title="Потяни, чтобы изменить ширину колонки"
                     onPointerDown={(e) => startResize(e, c.key)}
-                    onDoubleClick={() => autoWidth(c.key, ci)}
                   />
                 </div>
               );
