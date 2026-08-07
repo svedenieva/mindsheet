@@ -103,7 +103,10 @@ function trackFor(column: ColumnDef, isFirst: boolean): string {
   if (isFirst) return 'minmax(0, 1.7fr)';
   if (column.type === 'number') return 'minmax(0, 0.6fr)';
   if (column.type === 'url') return 'minmax(0, 1.4fr)';
-  if (column.type === 'select') return 'minmax(0, 1fr)';
+  // select-колонки держат бейджи-пилюли: без нижнего предела их сжимало до
+  // ~60px, и текст в пилюле резался. 100px хватает большинству ярлыков на одну
+  // строку, длинные переносятся (а не обрезаются).
+  if (column.type === 'select') return 'minmax(100px, 1fr)';
   return 'minmax(0, 1.1fr)'; // text
 }
 
