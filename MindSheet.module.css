@@ -230,6 +230,9 @@
   padding: 11px 20px;
   background: light-dark(#fbfaf8, #171c20);
   border-bottom: 1px solid var(--rule);
+  /* мягкая тень снизу — когда строки уезжают под шапку, видно, что она
+     «висит» сверху, а не сливается с таблицей */
+  box-shadow: 0 6px 12px -10px light-dark(rgba(20, 20, 20, 0.4), rgba(0, 0, 0, 0.7));
   font-family: var(--font-mono), monospace;
   font-size: 10px;
   letter-spacing: 0.09em;
@@ -246,6 +249,13 @@
      торчащая в зазор между колонками, срезалась бы по краю ячейки */
   overflow: visible;
 }
+
+/* Вертикальные разделители между колонками — таблица читается как сетка,
+   ячейки визуально «расчерчены» между собой. Рисуем ЛЕВЫМ бордюром: левые
+   края колонок в шапке и в строках совпадают пиксель-в-пиксель (правые — нет,
+   потому что в шапке между ячейками виден зазор, а в строках он «съеден»).
+   Линия ставится на границе с предыдущей колонкой; у самой первой её нет. */
+.th:not(.firstCol) { border-left: 1px solid var(--rule); }
 
 .thLabel {
   min-width: 0;
@@ -269,12 +279,15 @@
   touch-action: none;
 }
 
+/* Зелёная подсветка границы, когда берёшься прямо за край, чтобы тянуть.
+   Постоянный разделитель между колонками рисуется бордюром ячеек (ниже),
+   а это — только «активный» вид самой границы под курсором. */
 .resizer::after {
   content: '';
   position: absolute;
   top: 6px;
   bottom: 6px;
-  left: 7px;
+  left: 9px;
   width: 2px;
   border-radius: 2px;
   background: transparent;
@@ -285,6 +298,28 @@
 .resizer:active::after {
   background: var(--sage);
 }
+
+/* «ручка» ширины — маленький маркер на самой границе. Наводишь на колонку —
+   проявляется бледным; берёшься за край — становится ярким. Это и есть видимая
+   подсказка «здесь тянут ширину». */
+.resizer::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 6px;
+  height: 18px;
+  transform: translateY(-50%);
+  border-radius: 4px;
+  background: var(--sage);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+.th:hover .resizer::before { opacity: 0.4; }
+.resizer:hover::before,
+.resizer:active::before { opacity: 1; }
 
 /* number / select columns read better centered */
 .center {
@@ -381,6 +416,11 @@
   line-height: 1.45;
   color: var(--ink-70);
 }
+
+/* та же вертикальная разлиновка в строках — левым бордюром, чтобы линии
+   совпадали с шапкой (левые края колонок выровнены). Бордюр не режется
+   overflow-ом ячейки, поэтому работает во всех режимах текста. */
+.td:not(.firstCol) { border-left: 1px solid var(--rule); }
 
 /* ── что делать с текстом, который не влез (Google WrapStrategy) ──────
    WRAP — ячейка тянется вниз, до N строк или до всего объёма;

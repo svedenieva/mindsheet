@@ -864,6 +864,7 @@ export default function MindSheet({
                   role="columnheader"
                   className={cx(
                     styles.th,
+                    ci === 0 && styles.firstCol,
                     isCentered(c) && styles.center,
                     dragCol === c.key && styles.thDragging,
                     dropCol === c.key && styles.thDropTarget,
@@ -1309,6 +1310,7 @@ export default function MindSheet({
               role="cell"
               className={cx(
                 styles.td,
+                i === 0 && styles.firstCol,
                 editingThis ? styles.wrapCell : cellMode(r, i),
                 c.key === firstKey && styles.strong,
                 isCentered(c) && styles.center,
