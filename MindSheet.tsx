@@ -115,7 +115,7 @@ export default function MindSheet({
   columns, records, total, loading, filtersPosition = 'top',
   sort, filter, filters, filterOptions, search,
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
-  editable, onCellEdit, onAddRow, autoGroup, sorts, onSortsChange, onSortReset,
+  editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
   editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnsReorder,
@@ -123,6 +123,9 @@ export default function MindSheet({
 }: MindSheetProps) {
   const favSet = new Set(favorites ?? []);
   const canFavorite = Boolean(onToggleFavorite);
+  // опт-ин контрол удаления строки — виден только в editable-режиме, когда
+  // хост передал обработчик; отсутствие пропа не меняет разметку вовсе
+  const showRowDelete = Boolean(editable && onDeleteRow);
   const filterables = columns.filter((c) => c.filterable);
   const sidebar = filtersPosition === 'left';
 
@@ -258,7 +261,7 @@ export default function MindSheet({
       });
       return;
     }
-    const lead = (rowsClickable || editable ? 1 : 0) + (canFavorite ? 1 : 0);
+    const lead = (rowsClickable || editable ? 1 : 0) + (canFavorite ? 1 : 0) + (showRowDelete ? 1 : 0);
     let need = 0;
     for (const row of root.querySelectorAll<HTMLElement>(`.${styles.row}`)) {
       const cell = row.children[lead + index] as HTMLElement | undefined;
@@ -274,6 +277,14 @@ export default function MindSheet({
 
   // строка, раскрытая карточкой сбоку
   const [openRow, setOpenRow] = useState<string | null>(null);
+
+  // ── перетаскивание строк (ручной порядок) ───────────────────────────
+  const [dragRow, setDragRow] = useState<string | null>(null); // какую строку тащим
+  const [overRow, setOverRow] = useState<{ id: string; below: boolean } | null>(null);
+  // оптимистичный порядок: показываем новый порядок сразу, до ответа сервера.
+  // Сбрасываем, как только придёт свежий набор строк (там уже нужный порядок).
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+  useEffect(() => { setLocalOrder(null); }, [records]);
 
   // ── живое управление колонками ──────────────────────────────────────
   const [colMenu, setColMenu] = useState<string | null>(null); // key колонки с открытым меню
@@ -396,6 +407,32 @@ export default function MindSheet({
   const firstKey = gridCols[0]?.key;
   const rowsClickable = Boolean(onRowOpen);
 
+  // Ручной порядок строк доступен только в «естественном» порядке: без
+  // сортировки (иначе drag спорит с ней), без поиска/фильтров (виден срез, а
+  // не вся база) и без подмешанных строк вложенных баз (у них свой base_id —
+  // сервер их не переставит). Всё это проверяем по входным пропсам.
+  const anyFilter = Boolean(filter) || Boolean(filters && Object.keys(filters).length);
+  // «сборный» вид (база + вложенные) помечается колонкой __source — строки
+  // таких баз имеют разный base_id, и сервер их одним списком не переставит.
+  // Проверяем именно колонку: скрытое поле __source хост добавляет и одиночным
+  // базам, а вот колонка появляется только при наличии вложенных.
+  const mixedSources = columns.some((c) => c.key === '__source');
+  const canReorderRows =
+    Boolean(editable && onRowReorder) &&
+    !(sorts?.length) && !sort &&
+    !search && !anyFilter && !mixedSources;
+
+  // применяем оптимистичный порядок к строкам (только когда drag включён)
+  const orderedRecords = (() => {
+    if (!localOrder || !canReorderRows) return records;
+    const byId = new Map(records.map((r) => [String(r.id), r]));
+    const seen = new Set<string>();
+    const out: Row[] = [];
+    for (const id of localOrder) { const r = byId.get(id); if (r) { out.push(r); seen.add(id); } }
+    for (const r of records) if (!seen.has(String(r.id))) out.push(r);
+    return out;
+  })();
+
   const lead = rowsClickable || editable ? '22px' : '0px';
 
   const sizedCols = Object.keys(display.widths).length > 0;
@@ -403,21 +440,37 @@ export default function MindSheet({
 
   // Заморозка первой колонки имеет смысл только когда таблица едет вбок —
   // то есть после того, как ширины задали руками. Прижимаем служебные ячейки
-  // слева и саму колонку с названием.
+  // слева и саму колонку с названием. Список активных лид-колонок идёт в
+  // том же порядке, в каком они реально рендерятся (caret → star → delete),
+  // поэтому смещения (--fzN) считаются накопительно по нему — годится для
+  // любой комбинации, а не только «есть обе» / «есть одна».
+  const HANDLE_W = 22;
   const CARET_W = 22;
   const STAR_W = 24;
+  const DEL_W = 20;
   const GAP = 10;
-  const leadCount = (rowsClickable || editable ? 1 : 0) + (canFavorite ? 1 : 0);
+  // ручка перетаскивания идёт самой левой лид-ячейкой — до caret/star/delete
+  const leadWidths = [
+    ...(canReorderRows ? [HANDLE_W] : []),
+    ...(rowsClickable || editable ? [CARET_W] : []),
+    ...(canFavorite ? [STAR_W] : []),
+    ...(showRowDelete ? [DEL_W] : []),
+  ];
+  const leadCount = leadWidths.length;
   const freezeClass = sizedCols
-    ? [styles.freeze1, styles.freeze2, styles.freeze3][leadCount]
+    ? [styles.freeze1, styles.freeze2, styles.freeze3, styles.freeze4][Math.min(leadCount, 3)]
     : undefined;
-  const freezeVars = {
-    '--fz2': `${(rowsClickable || editable ? CARET_W : STAR_W) + GAP}px`,
-    '--fz3': `${CARET_W + GAP + STAR_W + GAP}px`,
-  } as CSSProperties;
+  const freezeVars: CSSProperties = {};
+  let leadAcc = 0;
+  leadWidths.forEach((w, i) => {
+    leadAcc += w + GAP;
+    (freezeVars as Record<string, string>)[`--fz${i + 2}`] = `${leadAcc}px`;
+  });
   const grid = [
+    ...(canReorderRows ? [`${HANDLE_W}px`] : []),
     lead,
     ...(canFavorite ? ['24px'] : []),
+    ...(showRowDelete ? [`${DEL_W}px`] : []),
     ...gridCols.map((c, i) => (display.widths[c.key] ? `${display.widths[c.key]}px` : trackFor(c, i === 0))),
     // хвостовой трек под «+ колонка»; строки его просто оставляют пустым
     ...(editableColumns ? [`${ADD_COL_TRACK}px`] : []),
@@ -528,7 +581,7 @@ export default function MindSheet({
       }
     })(groups);
   } else {
-    for (const r of records) items.push({ kind: 'row', row: r });
+    for (const r of orderedRecords) items.push({ kind: 'row', row: r });
   }
 
   // ── окно видимых строк ──────────────────────────────────────────────
@@ -798,8 +851,10 @@ export default function MindSheet({
     <div className={cx(styles.tableScroll, sizedCols && styles.sized)} ref={tableRef}>
       <div className={cx(styles.table, editable && styles.compact)} style={gridStyle} role="table">
           <div className={cx(styles.tableHead, freezeClass)} style={freezeVars} role="row">
+            {canReorderRows && <div className={styles.caretCell} aria-hidden="true" />}
             <div className={styles.caretCell} aria-hidden="true" />
             {canFavorite && <div className={styles.caretCell} aria-hidden="true">★</div>}
+            {showRowDelete && <div className={styles.caretCell} aria-hidden="true" />}
             {gridCols.map((c, ci) => {
               const levelIdx = levels.findIndex((l) => l.key === c.key);
               const active = levelIdx >= 0;
@@ -976,8 +1031,10 @@ export default function MindSheet({
           {loading && records.length === 0 ? (
             Array.from({ length: 12 }).map((_, i) => (
               <div key={i} className={styles.row} aria-hidden="true">
+                {canReorderRows && <div className={styles.caretCell} />}
                 <div className={styles.caretCell} />
                 {canFavorite && <div className={styles.caretCell} />}
+                {showRowDelete && <div className={styles.caretCell} />}
                 {gridCols.map((c) => (
                   <div key={c.key} className={cx(styles.td, isCentered(c) && styles.center)}>
                     <span className={styles.skel} style={{ width: `${50 + ((i * 7 + c.key.length * 5) % 45)}%` }} />
@@ -1022,8 +1079,10 @@ export default function MindSheet({
 
           {editable && !loading && (
             <div className={cx(styles.row, styles.addRow)} role="row">
+              {canReorderRows && <div className={styles.caretCell} />}
               <div className={styles.caretCell} aria-hidden="true">+</div>
               {canFavorite && <div className={styles.caretCell} />}
+              {showRowDelete && <div className={styles.caretCell} />}
               {gridCols.map((c) => (
                 <div key={c.key} className={cx(styles.td, isCentered(c) && styles.center)}>
                   {cellInput(
@@ -1101,7 +1160,24 @@ export default function MindSheet({
   }
 
   // отрисовка одной строки таблицы (плоский и групповой вид)
+  // перетащили строку sourceId и бросили на targetId (ниже её середины → below)
+  function performReorder(sourceId: string, targetId: string, below: boolean) {
+    if (sourceId === targetId) return;
+    const ids = orderedRecords.map((r) => String(r.id));
+    const from = ids.indexOf(sourceId);
+    if (from < 0) return;
+    ids.splice(from, 1);
+    let to = ids.indexOf(targetId);
+    if (to < 0) return;
+    if (below) to += 1;
+    ids.splice(to, 0, sourceId);
+    setLocalOrder(ids); // оптимистично — строка встаёт на место сразу
+    onRowReorder!(ids);
+  }
+
   function renderRow(r: Row, index: number) {
+    const dragging = canReorderRows && dragRow === String(r.id);
+    const dropHere = canReorderRows && overRow?.id === String(r.id) && dragRow !== String(r.id);
     return (
       <div
         key={r.id}
@@ -1111,9 +1187,33 @@ export default function MindSheet({
           rowsClickable && styles.clickable,
           freezeClass,
           String(r.id) === openRow && styles.rowOpen,
+          dragging && styles.rowDragging,
+          dropHere && (overRow!.below ? styles.dropBelow : styles.dropAbove),
         )}
         style={freezeVars}
         role={rowsClickable ? "button" : "row"}
+        onDragOver={
+          canReorderRows && dragRow
+            ? (e) => {
+                e.preventDefault();
+                const rect = e.currentTarget.getBoundingClientRect();
+                const below = e.clientY > rect.top + rect.height / 2;
+                if (overRow?.id !== String(r.id) || overRow?.below !== below) setOverRow({ id: String(r.id), below });
+              }
+            : undefined
+        }
+        onDrop={
+          canReorderRows && dragRow
+            ? (e) => {
+                e.preventDefault();
+                const rect = e.currentTarget.getBoundingClientRect();
+                const below = e.clientY > rect.top + rect.height / 2;
+                performReorder(dragRow, String(r.id), below);
+                setDragRow(null);
+                setOverRow(null);
+              }
+            : undefined
+        }
         tabIndex={rowsClickable ? 0 : undefined}
         onClick={rowsClickable ? () => onRowOpen!(r) : undefined}
         onKeyDown={
@@ -1127,6 +1227,26 @@ export default function MindSheet({
             : undefined
         }
       >
+        {canReorderRows && (
+          <div className={styles.caretCell}>
+            {/* ручка перетаскивания: тащим только за неё, чтобы правка ячеек
+                и раскрытие карточки продолжали работать */}
+            <span
+              className={styles.dragHandle}
+              draggable
+              title="Перетащить строку"
+              aria-label="Перетащить строку"
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(r.id));
+                setDragRow(String(r.id));
+              }}
+              onDragEnd={() => { setDragRow(null); setOverRow(null); }}
+            >
+              ⠿
+            </span>
+          </div>
+        )}
         {recordCard ? (
           <div className={styles.caretCell}>
             {/* раскрыть строку целиком — отдельной кнопкой, чтобы правка
@@ -1161,6 +1281,23 @@ export default function MindSheet({
               onKeyDown={(e) => e.stopPropagation()}
             >
               {favSet.has(r.id) ? '★' : '☆'}
+            </button>
+          </div>
+        )}
+        {editable && onDeleteRow && (
+          <div className={styles.caretCell}>
+            <button
+              type="button"
+              className={styles.rowDelete}
+              title="Удалить строку"
+              aria-label="Удалить строку"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteRow(r);
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              🗑
             </button>
           </div>
         )}

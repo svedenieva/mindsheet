@@ -156,4 +156,22 @@ describe('MindSheet', () => {
       expect(screen.getByRole('button', { name: chip })).toBeDisabled();
     }
   });
+
+  it('calls onDeleteRow when the row delete control is clicked', () => {
+    const onDeleteRow = vi.fn();
+    render(
+      <MindSheet columns={columns} records={records} editable
+        onSortChange={() => {}} onFilterChange={() => {}} onDeleteRow={onDeleteRow} />,
+    );
+    fireEvent.click(screen.getAllByRole('button', { name: /удалить строку/i })[0]);
+    expect(onDeleteRow).toHaveBeenCalledWith(records[0]);
+  });
+
+  it('does not render a delete control without onDeleteRow', () => {
+    render(
+      <MindSheet columns={columns} records={records} editable
+        onSortChange={() => {}} onFilterChange={() => {}} />,
+    );
+    expect(screen.queryByRole('button', { name: /удалить строку/i })).toBeNull();
+  });
 });

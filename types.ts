@@ -135,4 +135,11 @@ export interface MindSheetProps {
   onCellEdit?: (record: Row, key: string, value: string) => void;
   /** append a new row from the bottom input line (columnKey → value) */
   onAddRow?: (data: Record<string, string>) => void;
+  /** Ручной порядок строк перетаскиванием. Хост передаёт колбэк только когда
+      порядок «естественный» — без сортировки, фильтров и поиска (иначе drag
+      конфликтует с порядком, заданным сортировкой). Приходит полный список id
+      строк в новом порядке. */
+  onRowReorder?: (orderedIds: string[]) => void;
+  /** удалить строку: показывает контрол удаления в строке (только в editable) */
+  onDeleteRow?: (record: Row) => void;
 }
