@@ -1060,7 +1060,8 @@
 .freeze1 > *:nth-child(-n + 1),
 .freeze2 > *:nth-child(-n + 2),
 .freeze3 > *:nth-child(-n + 3),
-.freeze4 > *:nth-child(-n + 4) {
+.freeze4 > *:nth-child(-n + 4),
+.freeze5 > *:nth-child(-n + 5) {
   position: sticky;
   z-index: 3;
   background: var(--paper-raised);
@@ -1069,22 +1070,40 @@
 .freeze1 > *:nth-child(1),
 .freeze2 > *:nth-child(1),
 .freeze3 > *:nth-child(1),
-.freeze4 > *:nth-child(1) { left: 0; }
+.freeze4 > *:nth-child(1),
+.freeze5 > *:nth-child(1) { left: 0; }
 
 .freeze2 > *:nth-child(2),
 .freeze3 > *:nth-child(2),
-.freeze4 > *:nth-child(2) { left: var(--fz2, 0px); }
+.freeze4 > *:nth-child(2),
+.freeze5 > *:nth-child(2) { left: var(--fz2, 0px); }
 
 .freeze3 > *:nth-child(3),
-.freeze4 > *:nth-child(3) { left: var(--fz3, 0px); }
+.freeze4 > *:nth-child(3),
+.freeze5 > *:nth-child(3) { left: var(--fz3, 0px); }
 
-.freeze4 > *:nth-child(4) { left: var(--fz4, 0px); }
+.freeze4 > *:nth-child(4),
+.freeze5 > *:nth-child(4) { left: var(--fz4, 0px); }
+
+.freeze5 > *:nth-child(5) { left: var(--fz5, 0px); }
+
+/* Правый край примороженной части (это как раз колонка с названием) — мягкая
+   тень, чтобы прижатая колонка «висела» над уезжающими вправо, а не сливалась.
+   Целимся в самую правую из липких ячеек каждого варианта. */
+.freeze1 > *:nth-child(1),
+.freeze2 > *:nth-child(2),
+.freeze3 > *:nth-child(3),
+.freeze4 > *:nth-child(4),
+.freeze5 > *:nth-child(5) {
+  box-shadow: 10px 0 12px -10px light-dark(rgba(20, 20, 20, 0.45), rgba(0, 0, 0, 0.7));
+}
 
 /* шапка таблицы и без того липкая сверху — не дадим ей уехать под строки */
 .tableHead.freeze1 > *:nth-child(-n + 1),
 .tableHead.freeze2 > *:nth-child(-n + 2),
 .tableHead.freeze3 > *:nth-child(-n + 3),
-.tableHead.freeze4 > *:nth-child(-n + 4) {
+.tableHead.freeze4 > *:nth-child(-n + 4),
+.tableHead.freeze5 > *:nth-child(-n + 5) {
   z-index: 6;
   background: light-dark(#fbfaf8, #171c20);
 }
@@ -1092,7 +1111,8 @@
 .row:hover.freeze1 > *:nth-child(-n + 1),
 .row:hover.freeze2 > *:nth-child(-n + 2),
 .row:hover.freeze3 > *:nth-child(-n + 3),
-.row:hover.freeze4 > *:nth-child(-n + 4) {
+.row:hover.freeze4 > *:nth-child(-n + 4),
+.row:hover.freeze5 > *:nth-child(-n + 5) {
   background: light-dark(#fbfaf8, #181d21);
 }
 

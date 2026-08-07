@@ -457,8 +457,12 @@ export default function MindSheet({
     ...(showRowDelete ? [DEL_W] : []),
   ];
   const leadCount = leadWidths.length;
+  // прижимаем все лид-ячейки + колонку с названием, поэтому нужен вариант на
+  // единицу больше числа служебных колонок: freeze(leadCount + 1). Раньше
+  // индекс упирался в 3, и при четырёх служебных (ручка+раскрыть+звезда+удалить)
+  // примораживались только они, а само название уезжало вправо.
   const freezeClass = sizedCols
-    ? [styles.freeze1, styles.freeze2, styles.freeze3, styles.freeze4][Math.min(leadCount, 3)]
+    ? [styles.freeze1, styles.freeze2, styles.freeze3, styles.freeze4, styles.freeze5][leadCount]
     : undefined;
   const freezeVars: CSSProperties = {};
   let leadAcc = 0;
