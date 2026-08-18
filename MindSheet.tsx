@@ -43,6 +43,7 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   typeText: 'Текст', typeNumber: 'Число', typeSelect: 'Выбор', typeUrl: 'Ссылка', typeLongText: 'Длинный текст',
   widthHead: 'Ширина',
   fitContent: 'По содержимому',
+  fitAllContent: 'Подогнать все под содержимое',
   resetWidth: 'Сбросить ширину',
   deleteColumn: 'Удалить колонку',
   deleteColumnConfirm: (label) => `Удалить колонку «${label}»? Её значения из строк будут скрыты.`,
@@ -320,6 +321,31 @@ export default function MindSheet({
     // немного воздуха, чтобы текст не упирался в границу
     const width = Math.min(520, Math.max(MIN_COL_WIDTH, Math.ceil(need) + 12));
     setDisplay((d) => ({ ...d, widths: { ...d.widths, [key]: width } }));
+  };
+
+  // «Подогнать все под содержимое» — одной кнопкой меряем все колонки за один
+  // проход по таблице (заголовки + строки) и ставим каждой ширину под её самую
+  // длинную ячейку: длинные колонки становятся широкими, короткие — узкими
+  // (в тех же рамках 64..520px, что и у по-колоночного «По содержимому»).
+  const fitAllWidths = () => {
+    const root = tableRef.current;
+    if (!root) return;
+    const need: number[] = [];
+    const track = (i: number, w: number) => { need[i] = Math.max(need[i] ?? 0, w); };
+    root
+      .querySelector<HTMLElement>(`.${styles.tableHead}`)
+      ?.querySelectorAll<HTMLElement>(`.${styles.th}`)
+      .forEach((cell, i) => track(i, cell.scrollWidth));
+    for (const row of root.querySelectorAll<HTMLElement>(`.${styles.row}`)) {
+      row.querySelectorAll<HTMLElement>(`.${styles.td}`).forEach((cell, i) => track(i, cell.scrollWidth));
+    }
+    setDisplay((d) => {
+      const widths = { ...d.widths };
+      gridCols.forEach((c, i) => {
+        if (need[i]) widths[c.key] = Math.min(520, Math.max(MIN_COL_WIDTH, Math.ceil(need[i]) + 12));
+      });
+      return { ...d, widths };
+    });
   };
 
   // снять ручную ширину — колонка возвращается к резиновому треку
@@ -911,6 +937,9 @@ export default function MindSheet({
               </>
             )}
 
+            <button type="button" className={styles.viewLink} onClick={fitAllWidths}>
+              {S.fitAllContent}
+            </button>
             {sizedCols && (
               <button type="button" className={styles.viewLink} onClick={resetWidths}>
                 {S.autoWidthLink}

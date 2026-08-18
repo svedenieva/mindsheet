@@ -189,6 +189,7 @@ export interface MindSheetStrings {
   typeText: string; typeNumber: string; typeSelect: string; typeUrl: string; typeLongText: string;
   widthHead: string;
   fitContent: string;
+  fitAllContent: string;
   resetWidth: string;
   deleteColumn: string;
   deleteColumnConfirm: (label: string) => string;
