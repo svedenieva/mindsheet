@@ -907,6 +907,24 @@
 
 .viewLink:hover { text-decoration: underline; }
 
+/* выпадашка «Фильтры» слева — те же селекты, но не занимают всю колонку */
+.filtersPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 21;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 11px;
+  max-height: min(72vh, 560px);
+  overflow-y: auto;
+  background: var(--paper-raised);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card), var(--ring);
+}
+
 /* в сайдбаре кнопка занимает всю ширину, панель раскрывается вправо */
 .sidebar .viewMenu { display: flex; }
 .sidebar .viewBtn { width: 100%; text-align: left; }

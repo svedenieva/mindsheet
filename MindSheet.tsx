@@ -203,6 +203,8 @@ export default function MindSheet({
     wrap: 'wrap', lines: editable ? 1 : 3, widths: {}, aggregates: {}, ...defaultDisplay,
   }));
   const [viewOpen, setViewOpen] = useState(false);
+  // фильтры слева свёрнуты в выпадашку — панель не занимает всю колонку
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // раздел итогов внутри панели «Вид» — свёрнут, пока не понадобится
   const [aggOpen, setAggOpen] = useState(false);
   // читаем сохранённый вид только на клиенте — иначе разъедется гидрация
@@ -857,6 +859,37 @@ export default function MindSheet({
     <button type="button" className={styles.reset} onClick={onSortReset}>
       {S.clearSort}
     </button>
+  );
+
+  // фильтры слева — не постоянной колонкой, а выпадашкой «Фильтры»: кнопка со
+  // счётчиком активных, панель с теми же селектами раскрывается поверх таблицы.
+  const activeFilterCount = Object.values(filterMap).filter((v) => v !== '' && v != null).length;
+  const filtersEl = filterables.length > 0 && (
+    <div className={styles.viewMenu}>
+      <button
+        type="button"
+        className={styles.viewBtn}
+        aria-expanded={filtersOpen}
+        onClick={() => setFiltersOpen((o) => !o)}
+        title={S.filtersHead}
+      >
+        ⛃ {S.filtersHead}
+        {activeFilterCount > 0 && <span className={styles.viewFoldCount}>{activeFilterCount}</span>}
+      </button>
+      {filtersOpen && (
+        <>
+          <div className={styles.viewBackdrop} onClick={() => setFiltersOpen(false)} aria-hidden="true" />
+          <div
+            className={styles.filtersPanel}
+            role="dialog"
+            aria-label={S.filtersHead}
+            onKeyDown={(e) => { if (e.key === 'Escape') setFiltersOpen(false); }}
+          >
+            {filterEls}
+          </div>
+        </>
+      )}
+    </div>
   );
 
   // «Вид» — перенос текста, высота строки, сброс ширин. Одна кнопка, чтобы
@@ -1527,8 +1560,7 @@ export default function MindSheet({
         <div className={styles.withSidebar}>
           <aside className={styles.sidebar}>
             {searchEl}
-            {filterables.length > 0 && <div className={styles.sideHead}>{S.filtersHead}</div>}
-            {filterEls}
+            {filtersEl}
             {favEl}
             {displayEl}
             {sortResetEl}
