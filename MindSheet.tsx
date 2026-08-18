@@ -43,8 +43,8 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   typeText: 'Текст', typeNumber: 'Число', typeSelect: 'Выбор', typeUrl: 'Ссылка', typeLongText: 'Длинный текст',
   widthHead: 'Ширина',
   fitContent: 'По содержимому',
-  fitAllContent: 'Подогнать все под содержимое',
-  shrinkAllContent: 'Сузить все колонки',
+  fitAllContent: 'По содержимому',
+  shrinkAllContent: 'Компактно',
   resetWidth: 'Сбросить ширину',
   deleteColumn: 'Удалить колонку',
   deleteColumnConfirm: (label) => `Удалить колонку «${label}»? Её значения из строк будут скрыты.`,
@@ -948,12 +948,15 @@ export default function MindSheet({
               </>
             )}
 
-            <button type="button" className={styles.viewLink} onClick={fitAllWidths}>
-              {S.fitAllContent}
-            </button>
-            <button type="button" className={styles.viewLink} onClick={shrinkAllWidths}>
-              {S.shrinkAllContent}
-            </button>
+            <div className={styles.viewHead}>{S.widthHead}</div>
+            <div className={styles.viewRow}>
+              <button type="button" className={styles.viewChip} onClick={fitAllWidths}>
+                {S.fitAllContent}
+              </button>
+              <button type="button" className={styles.viewChip} onClick={shrinkAllWidths}>
+                {S.shrinkAllContent}
+              </button>
+            </div>
             {sizedCols && (
               <button type="button" className={styles.viewLink} onClick={resetWidths}>
                 {S.autoWidthLink}
