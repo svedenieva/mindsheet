@@ -550,9 +550,24 @@ export default function MindSheet({
   const levels: SortState[] = (sorts?.length ? sorts : sort ? [sort] : []).slice(0, 3);
   const nameKey = gridCols[0]?.key;
 
-  const groupValue = (r: Row, key: string) => {
-    const raw = hasValue(r[key]) ? String(r[key]).trim() : '';
-    return raw === '' ? '—' : raw;
+  // Значения ячейки для группировки. Мультиселект держит в ячейке массив, и
+  // раньше он проходил через String() — теги склеивались в одну бессмысленную
+  // группу «Популярность,Вердикт», которой не соответствует ни один фильтр.
+  // Теперь строка с двумя тегами попадает в группу КАЖДОГО своего тега, как в
+  // Notion и Airtable. Поэтому сумма счётчиков групп может быть больше числа
+  // строк: это не дубли, а одна запись, показанная в каждом своём разрезе.
+  const groupValues = (r: Row, key: string): string[] => {
+    const cell = r[key];
+
+    if (Array.isArray(cell)) {
+      const tags = [...new Set(
+        cell.map((v) => (hasValue(v) ? String(v).trim() : '')).filter((v) => v !== ''),
+      )];
+      return tags.length ? tags : ['—'];
+    }
+
+    const raw = hasValue(cell) ? String(cell).trim() : '';
+    return raw === '' ? ['—'] : [raw];
   };
 
   function buildGroups(rows: Row[], depth: number, prefix: string): GroupNode[] {
@@ -561,10 +576,11 @@ export default function MindSheet({
     const dir = level.dir === 'desc' ? -1 : 1;
     const map = new Map<string, Row[]>();
     for (const r of rows) {
-      const value = groupValue(r, level.key);
-      const bucket = map.get(value);
-      if (bucket) bucket.push(r);
-      else map.set(value, [r]);
+      for (const value of groupValues(r, level.key)) {
+        const bucket = map.get(value);
+        if (bucket) bucket.push(r);
+        else map.set(value, [r]);
+      }
     }
     const rank = (v: string) => {
       if (!col?.order) return -1;
@@ -606,8 +622,17 @@ export default function MindSheet({
   }
 
   const groups: GroupNode[] = autoGroup && levels.length ? buildGroups(records, 0, '') : [];
+  // сколько раз строки вообще показываются: с мультиселектом одна запись
+  // попадает в несколько групп, поэтому сравнивать с records.length нельзя —
+  // две записи с четырьмя разными тегами дали бы 4 группы > 2 строк, и
+  // группировка молча выключилась бы
+  const placements = (function count(nodes: GroupNode[]): number {
+    let n = 0;
+    for (const node of nodes) n += node.children ? count(node.children) : node.rows.length;
+    return n;
+  })(groups);
   // группировка осмысленна, только если она реально что-то объединяет
-  const grouped = groups.length > 0 && groups.length < records.length;
+  const grouped = groups.length > 0 && groups.length < placements;
   const allPaths: string[] = [];
   (function collect(nodes: GroupNode[]) {
     for (const n of nodes) {
@@ -623,7 +648,10 @@ export default function MindSheet({
   // ── что рисуем: плоский список заголовков групп и строк ─────────────
   // Виртуализация работает по одному списку независимо от того, сгруппировано
   // сейчас или нет: дерево групп разворачивается в ленту в порядке показа.
-  type Item = { kind: 'group'; node: GroupNode } | { kind: 'row'; row: Row };
+  // у строки теперь может быть несколько мест на экране, поэтому вместе с ней
+  // несём путь её группы: по нему строится ключ react, иначе две копии одной
+  // записи получили бы один и тот же key
+  type Item = { kind: 'group'; node: GroupNode } | { kind: 'row'; row: Row; path: string };
   const items: Item[] = [];
   if (grouped) {
     (function walk(nodes: GroupNode[]) {
@@ -631,11 +659,11 @@ export default function MindSheet({
         items.push({ kind: 'group', node: n });
         if (collapsed.has(n.path)) continue;
         if (n.children) walk(n.children);
-        else for (const r of n.rows) items.push({ kind: 'row', row: r });
+        else for (const r of n.rows) items.push({ kind: 'row', row: r, path: n.path });
       }
     })(groups);
   } else {
-    for (const r of orderedRecords) items.push({ kind: 'row', row: r });
+    for (const r of orderedRecords) items.push({ kind: 'row', row: r, path: '' });
   }
 
   // ── окно видимых строк ──────────────────────────────────────────────
@@ -1134,7 +1162,7 @@ export default function MindSheet({
               const i = from + k;
               return it.kind === 'group'
                 ? renderGroupHead(it.node, i)
-                : renderRow(it.row, i);
+                : renderRow(it.row, i, it.path);
             })}
             {padBottom > 0 && <div style={{ height: padBottom }} aria-hidden="true" />}
             </>
@@ -1238,12 +1266,12 @@ export default function MindSheet({
     onRowReorder!(ids);
   }
 
-  function renderRow(r: Row, index: number) {
+  function renderRow(r: Row, index: number, groupPath = '') {
     const dragging = canReorderRows && dragRow === String(r.id);
     const dropHere = canReorderRows && overRow?.id === String(r.id) && dragRow !== String(r.id);
     return (
       <div
-        key={r.id}
+        key={groupPath ? `${groupPath} :: ${r.id}` : String(r.id)}
         data-vi={index}
         className={cx(
           styles.row,
