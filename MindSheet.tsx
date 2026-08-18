@@ -44,6 +44,7 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   widthHead: 'Ширина',
   fitContent: 'По содержимому',
   fitAllContent: 'Подогнать все под содержимое',
+  shrinkAllContent: 'Сузить все колонки',
   resetWidth: 'Сбросить ширину',
   deleteColumn: 'Удалить колонку',
   deleteColumnConfirm: (label) => `Удалить колонку «${label}»? Её значения из строк будут скрыты.`,
@@ -347,6 +348,16 @@ export default function MindSheet({
       return { ...d, widths };
     });
   };
+
+  // «Сузить все колонки» — обратное к «Подогнать все»: жмём каждую колонку до
+  // минимальной ширины (в режиме «Сжать» шрифт сам ужмётся под неё, иначе
+  // работает перенос/обрезка). Быстрый способ вернуть таблице компактность.
+  const shrinkAllWidths = () =>
+    setDisplay((d) => {
+      const widths = { ...d.widths };
+      for (const c of gridCols) widths[c.key] = MIN_COL_WIDTH;
+      return { ...d, widths };
+    });
 
   // снять ручную ширину — колонка возвращается к резиновому треку
   const resetWidth = (key: string) =>
@@ -939,6 +950,9 @@ export default function MindSheet({
 
             <button type="button" className={styles.viewLink} onClick={fitAllWidths}>
               {S.fitAllContent}
+            </button>
+            <button type="button" className={styles.viewLink} onClick={shrinkAllWidths}>
+              {S.shrinkAllContent}
             </button>
             {sizedCols && (
               <button type="button" className={styles.viewLink} onClick={resetWidths}>

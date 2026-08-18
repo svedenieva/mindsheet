@@ -190,6 +190,7 @@ export interface MindSheetStrings {
   widthHead: string;
   fitContent: string;
   fitAllContent: string;
+  shrinkAllContent: string;
   resetWidth: string;
   deleteColumn: string;
   deleteColumnConfirm: (label: string) => string;
