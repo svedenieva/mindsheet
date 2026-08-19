@@ -1224,7 +1224,7 @@ export default function MindSheet({
                 <div className={styles.emptyIcon} aria-hidden="true">🗒️</div>
                 <div className={styles.emptyTitle}>{S.emptyTitle}</div>
                 {editable && onAddRow ? (
-                  <button type="button" className={styles.emptyBtn} onClick={onAddRow}>{S.emptyHint}</button>
+                  <button type="button" className={styles.emptyBtn} onClick={() => onAddRow({})}>{S.emptyHint}</button>
                 ) : (
                   <div className={styles.emptyHintText}>{S.emptyHint}</div>
                 )}
