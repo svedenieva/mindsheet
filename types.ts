@@ -199,6 +199,7 @@ export interface MindSheetStrings {
   resizerTitle: string;
   addColNamePlaceholder: string;
   addColumnAria: string;
+  addRowTitle: string;
   nothingFound: string;
   emptyTitle: string;
   emptyHint: string;

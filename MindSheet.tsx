@@ -53,6 +53,7 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   resizerTitle: 'Потяни, чтобы изменить ширину колонки',
   addColNamePlaceholder: 'Название',
   addColumnAria: 'Добавить колонку',
+  addRowTitle: 'Добавить строку',
   nothingFound: 'Ничего не найдено',
   emptyTitle: 'Здесь пока пусто',
   emptyHint: 'Добавьте первую строку',
@@ -1266,7 +1267,17 @@ export default function MindSheet({
           {editable && !loading && (
             <div className={cx(styles.row, styles.addRow)} role="row">
               {canReorderRows && <div className={styles.caretCell} />}
-              <div className={styles.caretCell} aria-hidden="true">+</div>
+              {/* a real button: click adds the row straight away (an empty one
+                  if nothing was typed), so you don't have to discover Enter */}
+              <button
+                type="button"
+                className={cx(styles.caretCell, styles.addRowBtn)}
+                title={S.addRowTitle}
+                aria-label={S.addRowTitle}
+                onClick={() => { onAddRow?.(addDraft); setAddDraft({}); }}
+              >
+                +
+              </button>
               {canFavorite && <div className={styles.caretCell} />}
               {showRowDelete && <div className={styles.caretCell} />}
               {gridCols.map((c) => (

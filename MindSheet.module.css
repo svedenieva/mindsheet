@@ -664,6 +664,16 @@
   font-weight: 600;
 }
 
+/* the "+" is a button, not decoration — make it read as one */
+.addRowBtn {
+  border: none;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+.addRowBtn:hover { background: var(--sage-soft); }
+
 /* ── auto-grouping on sort (Google-Sheets style +/- rows) ────── */
 .groupRow {
   display: flex;
