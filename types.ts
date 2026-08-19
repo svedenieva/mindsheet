@@ -200,6 +200,8 @@ export interface MindSheetStrings {
   addColNamePlaceholder: string;
   addColumnAria: string;
   nothingFound: string;
+  emptyTitle: string;
+  emptyHint: string;
   expandAll: string; collapseAll: string;
   expandGroup: string; collapseGroup: string;
   dragRow: string;

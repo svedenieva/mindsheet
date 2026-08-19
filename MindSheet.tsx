@@ -54,6 +54,8 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   addColNamePlaceholder: 'Название',
   addColumnAria: 'Добавить колонку',
   nothingFound: 'Ничего не найдено',
+  emptyTitle: 'Здесь пока пусто',
+  emptyHint: 'Добавьте первую строку',
   expandAll: 'Развернуть все', collapseAll: 'Свернуть все',
   expandGroup: 'Развернуть', collapseGroup: 'Свернуть',
   dragRow: 'Перетащить строку',
@@ -1213,7 +1215,21 @@ export default function MindSheet({
               </div>
             ))
           ) : records.length === 0 ? (
-            <div className={styles.none}>{S.nothingFound}</div>
+            isFiltered ? (
+              // narrowed by a filter/search to nothing
+              <div className={styles.none}>{S.nothingFound}</div>
+            ) : (
+              // the base itself has no rows yet
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon} aria-hidden="true">🗒️</div>
+                <div className={styles.emptyTitle}>{S.emptyTitle}</div>
+                {editable && onAddRow ? (
+                  <button type="button" className={styles.emptyBtn} onClick={onAddRow}>{S.emptyHint}</button>
+                ) : (
+                  <div className={styles.emptyHintText}>{S.emptyHint}</div>
+                )}
+              </div>
+            )
           ) : (
             <>
             {grouped && (

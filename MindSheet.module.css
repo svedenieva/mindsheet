@@ -570,6 +570,42 @@
   color: var(--ink-45);
 }
 
+/* friendly empty state for a base with no rows yet */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px 56px;
+  text-align: center;
+}
+.emptyIcon {
+  font-size: 34px;
+  opacity: 0.7;
+}
+.emptyTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.emptyHintText {
+  font-size: 13px;
+  color: var(--ink-45);
+}
+.emptyBtn {
+  margin-top: 2px;
+  padding: 8px 16px;
+  border: 1px solid var(--sage);
+  border-radius: var(--radius);
+  background: var(--sage);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: light-dark(#fff, #0e1113);
+  cursor: pointer;
+}
+.emptyBtn:hover { background: var(--sage-hover); border-color: var(--sage-hover); }
+
 /* ── spreadsheet (editable) mode ─────────────────────────────────
    dense rows so ~50 fit on screen, click-to-edit cells, add-row line */
 .compact .tableHead {
