@@ -1483,7 +1483,12 @@ export default function MindSheet({
               }}
               onKeyDown={(e) => e.stopPropagation()}
             >
-              🗑
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                <path d="M6 6v14a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6" />
+                <path d="M10 11v6M14 11v6" />
+              </svg>
             </button>
           </div>
         )}
