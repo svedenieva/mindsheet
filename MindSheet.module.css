@@ -681,6 +681,8 @@
   gap: 8px;
   padding: 7px 14px;
   border-top: 1px solid var(--rule);
+  /* акцентная полоса слева в тон базы — когда хост передал accent; иначе прозрачна */
+  border-left: 3px solid var(--accent, transparent);
   background: light-dark(#f4f2ee, #1b2126);
   font-size: 12.5px;
   position: sticky;

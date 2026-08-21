@@ -152,7 +152,7 @@ export default function MindSheet({
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
   editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnsReorder,
-  defaultDisplay, viewKey, strings,
+  defaultDisplay, viewKey, strings, accent,
 }: MindSheetProps) {
   // надписи: переданные хостом поверх русских значений по умолчанию
   const S: MindSheetStrings = { ...DEFAULT_STRINGS, ...strings };
@@ -1333,7 +1333,7 @@ export default function MindSheet({
         data-vi={index}
         className={cx(styles.groupRow, styles[`groupDepth${g.depth}`])}
         role="row"
-        style={{ paddingLeft: `${14 + g.depth * 18}px` }}
+        style={{ paddingLeft: `${14 + g.depth * 18}px`, ...(accent ? { ['--accent']: accent } as CSSProperties : {}) }}
       >
           <button
             type="button"
