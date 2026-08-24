@@ -372,7 +372,9 @@
   grid-template-columns: var(--grid);
   gap: 8px;
   align-items: start;
-  padding: 8px 14px;
+  /* vertical row padding is host-tunable for density; default 8px keeps the
+     current look for Fathom, AI Researcher sets it tighter. */
+  padding: var(--row-pad-y, 8px) 14px;
   border-top: 1px solid var(--rule);
   transition: background-color 0.12s ease;
 }
@@ -500,7 +502,9 @@
   display: inline-block;
   max-width: 100%;
   padding: 3px 9px;
-  border-radius: 999px;
+  /* pill by default; a host can square the badges off by setting --badge-radius
+     (AI Researcher does; Fathom leaves it unset and keeps the 999px pill). */
+  border-radius: var(--badge-radius, 999px);
   font-size: 11.5px;
   font-weight: 500;
   line-height: 1.3;
