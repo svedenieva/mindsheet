@@ -68,9 +68,20 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   ok: 'ОК',
   groupingBy: (label, count) => `группировка: ${label} · ${count}`,
   groupingHint: 'Shift + клик по заголовку — добавить уровень',
+  groupColorsLabel: 'Цветные группы',
   clearFilter: 'Убрать фильтр',
   filterByValue: (value) => `Фильтр: ${value}`,
 };
+
+// Stable, theme-agnostic tint for a group value: the same value always gets the
+// same hue. Used only when ViewDisplay.groupColors is on, so hosts that leave it
+// off are unaffected. The caller mixes this hue into the row background at low
+// alpha, which reads correctly on both light and dark themes.
+function groupHue(value: string): number {
+  let h = 0;
+  for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
 
 // Ниже этого размера сжимать бессмысленно — дальше уже не читается,
 // поэтому остаток честно обрезаем.
@@ -952,6 +963,14 @@ export default function MindSheet({
 
             {autoGroup && (
               <>
+                <label className={styles.viewToggle}>
+                  <input
+                    type="checkbox"
+                    checked={!!display.groupColors}
+                    onChange={(e) => setDisplay((d) => ({ ...d, groupColors: e.target.checked }))}
+                  />
+                  {S.groupColorsLabel}
+                </label>
                 {/* колонок бывает дюжина, и списком они растягивают панель на
                     весь экран — держим свёрнутыми, раскрывая по требованию */}
                 <button
@@ -1327,13 +1346,21 @@ export default function MindSheet({
           })
           .filter(Boolean)
       : [];
+    // when colouring is on, tint the header by its value and mark it with a
+    // colour bar on the left; the tint is a low-alpha mix so both themes stay legible
+    const colorStyle: CSSProperties = display.groupColors
+      ? {
+          background: `color-mix(in srgb, hsl(${groupHue(g.value)} 70% 50%) 13%, transparent)`,
+          boxShadow: `inset 3px 0 0 hsl(${groupHue(g.value)} 65% 48%)`,
+        }
+      : {};
     return (
       <div
         key={g.path}
         data-vi={index}
         className={cx(styles.groupRow, styles[`groupDepth${g.depth}`])}
         role="row"
-        style={{ paddingLeft: `${14 + g.depth * 18}px`, ...(accent ? { ['--accent']: accent } as CSSProperties : {}) }}
+        style={{ paddingLeft: `${14 + g.depth * 18}px`, ...colorStyle, ...(accent ? { ['--accent']: accent } as CSSProperties : {}) }}
       >
           <button
             type="button"

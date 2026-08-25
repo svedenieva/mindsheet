@@ -949,6 +949,22 @@
   color: var(--ink-25);
 }
 
+/* «Цветные группы» toggle in the View panel — off by default, so hosts that
+   don't use it see nothing new */
+.viewToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-70);
+  cursor: pointer;
+  user-select: none;
+}
+.viewToggle input {
+  accent-color: var(--accent, var(--sage, #4a7c6f));
+  cursor: pointer;
+}
+
 .viewLink {
   align-self: flex-start;
   margin-top: 2px;

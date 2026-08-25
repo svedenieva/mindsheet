@@ -48,6 +48,8 @@ export interface ViewDisplay {
   widths: Record<string, number>;
   /** какой итог показывать в заголовке группы: ключ колонки → вид итога */
   aggregates: Record<string, AggKind>;
+  /** при группировке — тонировать каждую группу своим цветом. Выкл по умолчанию. */
+  groupColors?: boolean;
 }
 
 export interface FilterState {
@@ -219,6 +221,7 @@ export interface MindSheetStrings {
   ok: string;
   groupingBy: (label: string, count: number) => string;
   groupingHint: string;
+  groupColorsLabel: string;
   clearFilter: string;
   filterByValue: (value: string) => string;
 }
