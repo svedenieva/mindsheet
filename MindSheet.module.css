@@ -521,6 +521,17 @@
   vertical-align: middle;
 }
 
+/* In Shrink-to-fit mode a badge behaves like text: one line, inheriting the
+   cell's (shrunk) font size and free of the max-width cap, so a slightly-too-wide
+   label like «WorkOS» shrinks to fit instead of wrapping. Every other wrap mode
+   keeps the wrapping badge above, so Fathom is unaffected. */
+.shrinkCell .badge {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  max-width: none;
+  font-size: inherit;
+}
+
 .badge_green  { background: light-dark(#e2efe6, #16281d); color: light-dark(#2c6b45, #83c99d); }
 .badge_teal   { background: light-dark(#e0efee, #14282a); color: light-dark(#2f5f61, #7fc7c0); }
 .badge_blue   { background: light-dark(#e7edf7, #172131); color: light-dark(#3f5c8a, #8fb0dd); }
