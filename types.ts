@@ -50,6 +50,10 @@ export interface ViewDisplay {
   aggregates: Record<string, AggKind>;
   /** при группировке — тонировать каждую группу своим цветом. Выкл по умолчанию. */
   groupColors?: boolean;
+  /** закрепить первую колонку (с названием) при прокрутке вбок. Выкл по умолчанию. */
+  freezeFirst?: boolean;
+  /** тонировать ячейки select-колонок по значению. Выкл по умолчанию. */
+  cellColors?: boolean;
 }
 
 export interface FilterState {
@@ -224,6 +228,8 @@ export interface MindSheetStrings {
   /** optional so existing hosts that build a full strings object don't break;
       DEFAULT_STRINGS still supplies it, and the host may localise it. */
   groupColorsLabel?: string;
+  freezeFirstLabel?: string;
+  cellColorsLabel?: string;
   clearFilter: string;
   filterByValue: (value: string) => string;
 }

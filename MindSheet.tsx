@@ -69,6 +69,8 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   groupingBy: (label, count) => `группировка: ${label} · ${count}`,
   groupingHint: 'Shift + клик по заголовку — добавить уровень',
   groupColorsLabel: 'Цветные группы',
+  freezeFirstLabel: 'Закрепить первую колонку',
+  cellColorsLabel: 'Цветные ячейки',
   clearFilter: 'Убрать фильтр',
   filterByValue: (value) => `Фильтр: ${value}`,
 };
@@ -564,15 +566,17 @@ export default function MindSheet({
     ...(canFavorite ? [STAR_W] : []),
     ...(showRowDelete ? [DEL_W] : []),
   ];
-  // Заморозка колонки с названием отключена по просьбе: при прокрутке вбок
-  // название больше не прилипает слева, и нет тени-«фейда» на его правом крае.
-  const freezeClass = undefined;
   const freezeVars: CSSProperties = {};
   let leadAcc = 0;
   leadWidths.forEach((w, i) => {
     leadAcc += w + GAP;
     (freezeVars as Record<string, string>)[`--fz${i + 2}`] = `${leadAcc}px`;
   });
+  // Opt-in: pin the lead cells + the name column so it stays put when the table
+  // scrolls sideways. The freeze machinery (offsets + fade shadow) is all in the
+  // CSS; freeze{N} pins the first N children, so N = lead cells + 1 (the name).
+  const freezeCount = leadWidths.length + 1;
+  const freezeClass = display.freezeFirst && freezeCount <= 5 ? styles[`freeze${freezeCount}`] : undefined;
   const grid = [
     ...(canReorderRows ? [`${HANDLE_W}px`] : []),
     lead,
@@ -960,6 +964,23 @@ export default function MindSheet({
             {display.wrap !== 'wrap' && (
               <div className={styles.viewNote}>{S.rowHeightNote}</div>
             )}
+
+            <label className={styles.viewToggle}>
+              <input
+                type="checkbox"
+                checked={!!display.freezeFirst}
+                onChange={(e) => setDisplay((d) => ({ ...d, freezeFirst: e.target.checked }))}
+              />
+              {S.freezeFirstLabel}
+            </label>
+            <label className={styles.viewToggle}>
+              <input
+                type="checkbox"
+                checked={!!display.cellColors}
+                onChange={(e) => setDisplay((d) => ({ ...d, cellColors: e.target.checked }))}
+              />
+              {S.cellColorsLabel}
+            </label>
 
             {autoGroup && (
               <>
@@ -1556,7 +1577,7 @@ export default function MindSheet({
                 : renderCell(r[c.key], c, search, {
                     activeValue: filterMap[c.key],
                     onFilter: toggleFilter,
-                  }, S)}
+                  }, S, display.cellColors)}
             </div>
           );
         })}
@@ -1598,7 +1619,7 @@ export default function MindSheet({
                       onCancel: () => setEditing(null),
                     })
                   : hasValue(value)
-                    ? renderCell(value, c, search)
+                    ? renderCell(value, c, search, undefined, S, display.cellColors)
                     : <span className={styles.empty}>—</span>}
               </div>
             </div>
@@ -1657,7 +1678,7 @@ interface BadgeCtx {
   onFilter?: (key: string, value: string) => void;
 }
 
-function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: BadgeCtx, s: MindSheetStrings = DEFAULT_STRINGS) {
+function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: BadgeCtx, s: MindSheetStrings = DEFAULT_STRINGS, colorByValue = false) {
   if (!hasValue(value)) {
     return <span className={styles.empty}>—</span>;
   }
@@ -1697,6 +1718,19 @@ function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: 
       );
     }
     return <span className={cls}>{String(value)}</span>;
+  }
+  // opt-in: colour a plain select cell by a stable hue derived from its value,
+  // so select columns without an explicit badge palette still read at a glance
+  if (colorByValue && col.type === 'select') {
+    const hue = groupHue(String(value));
+    return (
+      <span
+        className={styles.badge}
+        style={{ background: `color-mix(in srgb, hsl(${hue} 70% 50%) 18%, transparent)`, color: 'var(--ink)' }}
+      >
+        {String(value)}
+      </span>
+    );
   }
   return highlight(String(value), query);
 }
