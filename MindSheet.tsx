@@ -1658,7 +1658,9 @@ export default function MindSheet({
     <div className={styles.sheet}>
       <div className={styles.tableTools}>
         {searchEl}
-        {filterEls}
+        {/* 'menu' collapses the filters into one «Фильтры» popover button so the
+            toolbar stays compact; 'top' keeps them inline as before */}
+        {filtersPosition === 'menu' ? filtersEl : filterEls}
         {favEl}
         {displayEl}
         {sortResetEl}

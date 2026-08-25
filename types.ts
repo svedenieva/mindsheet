@@ -70,7 +70,7 @@ export interface MindSheetProps {
   /** shows skeleton rows on the first load (records empty + loading) */
   loading?: boolean;
   /** where the filter controls live: a top toolbar (default) or a left sidebar */
-  filtersPosition?: 'top' | 'left';
+  filtersPosition?: 'top' | 'left' | 'menu';
   sort?: SortState;
   /** legacy single filter (one facet at a time) */
   filter?: FilterState;
