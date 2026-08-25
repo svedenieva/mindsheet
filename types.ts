@@ -221,7 +221,9 @@ export interface MindSheetStrings {
   ok: string;
   groupingBy: (label: string, count: number) => string;
   groupingHint: string;
-  groupColorsLabel: string;
+  /** optional so existing hosts that build a full strings object don't break;
+      DEFAULT_STRINGS still supplies it, and the host may localise it. */
+  groupColorsLabel?: string;
   clearFilter: string;
   filterByValue: (value: string) => string;
 }
