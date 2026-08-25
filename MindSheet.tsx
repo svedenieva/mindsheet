@@ -269,10 +269,11 @@ export default function MindSheet({
     const all = Array.from(root.querySelectorAll<HTMLElement>(`.${styles.shrinkCell}`));
     for (const c of all) c.style.fontSize = '';
     if (display.wrap !== 'shrink' || !all.length) return;
-    // Короткие значения — регион, год, галочка — не переполняют даже узкую
-    // колонку, а замер каждой ячейки стоит пересчёта раскладки. Длину текста
-    // читаем без обращения к раскладке, поэтому отсев бесплатный.
-    const cells = all.filter((c) => (c.textContent ?? '').length >= 10);
+    // Меряем всё, кроме однобуквенных значений (галочка, значок): короткое
+    // слово вроде «США» или «Reddit» переполняет узкую колонку и тоже должно
+    // сжиматься, а не обрезаться. Длину читаем без обращения к раскладке, а сам
+    // замер дёшев — в DOM живут только видимые строки.
+    const cells = all.filter((c) => (c.textContent ?? '').trim().length >= 2);
     if (!cells.length) return;
     // базовый размер один на всю таблицу — читаем его один раз, а не по ячейке:
     // getComputedStyle на каждую из тысяч ячеек стоил дороже самих замеров
