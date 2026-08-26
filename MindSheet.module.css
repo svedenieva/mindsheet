@@ -667,6 +667,24 @@
   outline: none;
 }
 
+/* date / checkbox / rating cells */
+.cellCheck {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--sage, #2f8f6b);
+  cursor: pointer;
+}
+.dateCell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ratingCell {
+  color: light-dark(#d99a2b, #e0b45f);
+  letter-spacing: 1px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 /* bottom add-row line */
 .addRow {
   background: light-dark(#fbfaf8, #14181b);

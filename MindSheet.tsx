@@ -41,6 +41,7 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   rename: 'Переименовать',
   typeHead: 'Тип',
   typeText: 'Текст', typeNumber: 'Число', typeSelect: 'Выбор', typeUrl: 'Ссылка', typeLongText: 'Длинный текст',
+  typeDate: 'Дата', typeCheckbox: 'Галочка', typeRating: 'Рейтинг',
   widthHead: 'Ширина',
   fitContent: 'По содержимому',
   fitAllContent: 'По содержимому',
@@ -130,6 +131,22 @@ function hasValue(v: Row[string]): boolean {
   return v !== null && v !== undefined && v !== '';
 }
 
+// checkbox / date / rating helpers — one place, used by both render and edit
+function isChecked(v: Row[string]): boolean {
+  const s = String(v ?? '').trim().toLowerCase();
+  return s === 'true' || s === '1' || s === 'yes' || s === 'да' || s === 'так' || s === '✓' || s === '✔';
+}
+function formatDateCell(v: Row[string]): string {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString();
+}
+function ratingStars(v: Row[string]): string {
+  const n = Math.max(0, Math.min(5, Math.round(Number(v) || 0)));
+  return '★'.repeat(n) + '☆'.repeat(5 - n);
+}
+
 function distinct(records: Row[], key: string): string[] {
   const set = new Set<string>();
   for (const r of records) {
@@ -144,6 +161,9 @@ function distinct(records: Row[], key: string): string[] {
 // no horizontal scrolling — and cell text wraps instead of overflowing.
 function trackFor(column: ColumnDef, isFirst: boolean): string {
   if (isFirst) return 'minmax(0, 1.7fr)';
+  if (column.type === 'checkbox') return 'minmax(44px, 0.35fr)';
+  if (column.type === 'rating') return 'minmax(0, 0.6fr)';
+  if (column.type === 'date') return 'minmax(0, 0.75fr)';
   if (column.type === 'number') return 'minmax(0, 0.6fr)';
   if (column.type === 'url') return 'minmax(0, 1.4fr)';
   // select-колонки держат бейджи-пилюли: без нижнего предела их сжимало до
@@ -154,7 +174,7 @@ function trackFor(column: ColumnDef, isFirst: boolean): string {
 }
 
 function isCentered(column: ColumnDef): boolean {
-  return column.type === 'number' || column.type === 'select';
+  return column.type === 'number' || column.type === 'select' || column.type === 'checkbox' || column.type === 'rating';
 }
 
 export default function MindSheet({
@@ -191,6 +211,7 @@ export default function MindSheet({
   const COLUMN_TYPES: Array<{ id: ColumnType; label: string }> = [
     { id: 'text', label: S.typeText }, { id: 'number', label: S.typeNumber }, { id: 'select', label: S.typeSelect },
     { id: 'url', label: S.typeUrl }, { id: 'long-text', label: S.typeLongText },
+    { id: 'date', label: S.typeDate ?? 'Date' }, { id: 'checkbox', label: S.typeCheckbox ?? 'Checkbox' }, { id: 'rating', label: S.typeRating ?? 'Rating' },
   ];
   const favSet = new Set(favorites ?? []);
   const canFavorite = Boolean(onToggleFavorite);
@@ -676,7 +697,7 @@ export default function MindSheet({
       if (a.value === '—') return 1;
       if (b.value === '—') return -1;
       if (col?.order) return (rank(a.value) - rank(b.value)) * dir;
-      if (col?.type === 'number') return (Number(a.value) - Number(b.value)) * dir;
+      if (col?.type === 'number' || col?.type === 'rating') return (Number(a.value) - Number(b.value)) * dir;
       return a.value.localeCompare(b.value, 'ru') * dir;
     });
     return out;
@@ -814,22 +835,41 @@ export default function MindSheet({
       onCommit?: () => void;
       onCancel?: () => void;
     },
-  ) => (
-    <input
-      className={styles.cellInput}
-      autoFocus={opts.autoFocus}
-      type={col.type === 'number' ? 'number' : 'text'}
-      list={col.type === 'select' ? `dl-${col.key}` : undefined}
-      placeholder={opts.placeholder}
-      value={value}
-      onChange={(e) => onInput(e.target.value)}
-      onBlur={opts.commitOnBlur ? opts.onCommit : undefined}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.preventDefault(); opts.onCommit?.(); }
-        else if (e.key === 'Escape') { e.preventDefault(); opts.onCancel?.(); }
-      }}
-    />
-  );
+  ) => {
+    // a checkbox commits on toggle — no separate «type then Enter» step
+    if (col.type === 'checkbox') {
+      return (
+        <input
+          className={styles.cellCheck}
+          type="checkbox"
+          autoFocus={opts.autoFocus}
+          checked={isChecked(value)}
+          onChange={(e) => { onInput(e.target.checked ? 'true' : ''); opts.onCommit?.(); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); opts.onCancel?.(); } }}
+        />
+      );
+    }
+    const inputType = col.type === 'date' ? 'date' : col.type === 'rating' || col.type === 'number' ? 'number' : 'text';
+    return (
+      <input
+        className={styles.cellInput}
+        autoFocus={opts.autoFocus}
+        type={inputType}
+        min={col.type === 'rating' ? 0 : undefined}
+        max={col.type === 'rating' ? 5 : undefined}
+        step={col.type === 'rating' ? 1 : undefined}
+        list={col.type === 'select' ? `dl-${col.key}` : undefined}
+        placeholder={opts.placeholder}
+        value={value}
+        onChange={(e) => onInput(e.target.value)}
+        onBlur={opts.commitOnBlur ? opts.onCommit : undefined}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); opts.onCommit?.(); }
+          else if (e.key === 'Escape') { e.preventDefault(); opts.onCancel?.(); }
+        }}
+      />
+    );
+  };
 
   const searchEl = onSearchChange && (
     <input
@@ -1685,8 +1725,19 @@ interface BadgeCtx {
 }
 
 function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: BadgeCtx, s: MindSheetStrings = DEFAULT_STRINGS, colorByValue = false) {
+  // a checkbox is never «empty» — it's ticked or not, so it renders before the
+  // blank-value check (read-only here; clicking the cell opens the real toggle)
+  if (col.type === 'checkbox') {
+    return <input type="checkbox" className={styles.cellCheck} checked={isChecked(value)} readOnly tabIndex={-1} aria-label={col.label} />;
+  }
   if (!hasValue(value)) {
     return <span className={styles.empty}>—</span>;
+  }
+  if (col.type === 'date') {
+    return <span className={styles.dateCell}>{formatDateCell(value)}</span>;
+  }
+  if (col.type === 'rating') {
+    return <span className={styles.ratingCell} title={String(value)}>{ratingStars(value)}</span>;
   }
   if (col.type === 'url') {
     return (

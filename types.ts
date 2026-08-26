@@ -1,5 +1,5 @@
 export type Cell = string | number | null;
-export type ColumnType = 'text' | 'number' | 'long-text' | 'url' | 'select';
+export type ColumnType = 'text' | 'number' | 'long-text' | 'url' | 'select' | 'date' | 'checkbox' | 'rating';
 
 export interface ColumnDef {
   key: string;
@@ -203,6 +203,7 @@ export interface MindSheetStrings {
   rename: string;
   typeHead: string;
   typeText: string; typeNumber: string; typeSelect: string; typeUrl: string; typeLongText: string;
+  typeDate?: string; typeCheckbox?: string; typeRating?: string;
   widthHead: string;
   fitContent: string;
   fitAllContent: string;
