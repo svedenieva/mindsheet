@@ -165,7 +165,7 @@ export default function MindSheet({
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
   editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnsReorder,
-  defaultDisplay, viewKey, strings, accent,
+  defaultDisplay, forceDisplay, viewKey, strings, accent,
 }: MindSheetProps) {
   // надписи: переданные хостом поверх русских значений по умолчанию
   const S: MindSheetStrings = { ...DEFAULT_STRINGS, ...strings };
@@ -216,7 +216,7 @@ export default function MindSheet({
   const storeKey = viewKey ? `mindsheet:view:${viewKey}` : null;
   const [display, setDisplay] = useState<ViewDisplay>(() => ({
     // в режиме таблицы плотность важнее объёма — стартуем с одной строки
-    wrap: 'wrap', lines: editable ? 1 : 3, widths: {}, aggregates: {}, ...defaultDisplay,
+    wrap: 'wrap', lines: editable ? 1 : 3, widths: {}, aggregates: {}, ...defaultDisplay, ...forceDisplay,
   }));
   const [viewOpen, setViewOpen] = useState(false);
   // фильтры слева свёрнуты в выпадашку — панель не занимает всю колонку
@@ -231,7 +231,10 @@ export default function MindSheet({
     if (!storeKey) return;
     try {
       const raw = window.localStorage.getItem(storeKey);
-      if (raw) setDisplay((d) => ({ ...d, ...(JSON.parse(raw) as Partial<ViewDisplay>) }));
+      // forceDisplay wins over whatever was saved, so a host-mandated mode
+      // (e.g. wrap: 'shrink') isn't defeated by an older saved choice; widths
+      // and the rest still come back from localStorage.
+      if (raw) setDisplay((d) => ({ ...d, ...(JSON.parse(raw) as Partial<ViewDisplay>), ...forceDisplay }));
     } catch {
       /* приватный режим или битый JSON — просто едем с настройками по умолчанию */
     }
