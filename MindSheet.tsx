@@ -41,7 +41,7 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   rename: 'Переименовать',
   typeHead: 'Тип',
   typeText: 'Текст', typeNumber: 'Число', typeSelect: 'Выбор', typeUrl: 'Ссылка', typeLongText: 'Длинный текст',
-  typeDate: 'Дата', typeCheckbox: 'Галочка', typeRating: 'Рейтинг',
+  typeDate: 'Дата', typeCheckbox: 'Галочка', typeRating: 'Рейтинг', typeMultiselect: 'Теги',
   widthHead: 'Ширина',
   fitContent: 'По содержимому',
   fitAllContent: 'По содержимому',
@@ -147,10 +147,28 @@ function ratingStars(v: Row[string]): string {
   return '★'.repeat(n) + '☆'.repeat(5 - n);
 }
 
-function distinct(records: Row[], key: string): string[] {
+// A multiselect cell holds several tags, stored comma-separated (fits the string
+// Cell type and the host's JSON storage); an array is also accepted defensively.
+// Empty tags dropped, duplicates collapsed, order kept.
+function splitTags(v: Row[string]): string[] {
+  const parts = Array.isArray(v) ? v : String(v ?? '').split(',');
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const p of parts) {
+    const t = String(p ?? '').trim();
+    if (t && !seen.has(t)) { seen.add(t); out.push(t); }
+  }
+  return out;
+}
+
+// distinct values for a facet; when `multi`, a cell's tags are split so the
+// facet lists each tag on its own (multiselect columns).
+function distinct(records: Row[], key: string, multi = false): string[] {
   const set = new Set<string>();
   for (const r of records) {
-    if (hasValue(r[key])) set.add(String(r[key]));
+    if (!hasValue(r[key])) continue;
+    if (multi) for (const t of splitTags(r[key])) set.add(t);
+    else set.add(String(r[key]));
   }
   return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
 }
@@ -170,10 +188,13 @@ function trackFor(column: ColumnDef, isFirst: boolean): string {
   // ~60px, и текст в пилюле резался. 100px хватает большинству ярлыков на одну
   // строку, длинные переносятся (а не обрезаются).
   if (column.type === 'select') return 'minmax(100px, 1fr)';
+  // multiselect shows several pills — give it a touch more room than a single select
+  if (column.type === 'multiselect') return 'minmax(120px, 1.3fr)';
   return 'minmax(0, 1.1fr)'; // text
 }
 
 function isCentered(column: ColumnDef): boolean {
+  // multiselect is left-aligned: several pills read better from the left edge
   return column.type === 'number' || column.type === 'select' || column.type === 'checkbox' || column.type === 'rating';
 }
 
@@ -210,6 +231,7 @@ export default function MindSheet({
   ];
   const COLUMN_TYPES: Array<{ id: ColumnType; label: string }> = [
     { id: 'text', label: S.typeText }, { id: 'number', label: S.typeNumber }, { id: 'select', label: S.typeSelect },
+    { id: 'multiselect', label: S.typeMultiselect ?? 'Tags' },
     { id: 'url', label: S.typeUrl }, { id: 'long-text', label: S.typeLongText },
     { id: 'date', label: S.typeDate ?? 'Date' }, { id: 'checkbox', label: S.typeCheckbox ?? 'Checkbox' }, { id: 'rating', label: S.typeRating ?? 'Rating' },
   ];
@@ -641,10 +663,12 @@ export default function MindSheet({
   const groupValues = (r: Row, key: string): string[] => {
     const cell = r[key];
 
-    if (Array.isArray(cell)) {
-      const tags = [...new Set(
-        cell.map((v) => (hasValue(v) ? String(v).trim() : '')).filter((v) => v !== ''),
-      )];
+    // a multiselect (or an array) row falls into the group of EACH of its tags,
+    // as in Notion/Airtable — this is what groups nodes by topic (§5.7). The sum
+    // of group counts can exceed the row count: one row shown in each of its cuts.
+    const col = columns.find((c) => c.key === key);
+    if (Array.isArray(cell) || col?.type === 'multiselect') {
+      const tags = splitTags(cell);
       return tags.length ? tags : ['—'];
     }
 
@@ -858,7 +882,7 @@ export default function MindSheet({
         min={col.type === 'rating' ? 0 : undefined}
         max={col.type === 'rating' ? 5 : undefined}
         step={col.type === 'rating' ? 1 : undefined}
-        list={col.type === 'select' ? `dl-${col.key}` : undefined}
+        list={col.type === 'select' || col.type === 'multiselect' ? `dl-${col.key}` : undefined}
         placeholder={opts.placeholder}
         value={value}
         onChange={(e) => onInput(e.target.value)}
@@ -892,7 +916,7 @@ export default function MindSheet({
         onChange={(e) => setFilter(c.key, e.target.value)}
       >
         <option value="">{S.filterAll}</option>
-        {(filterOptions?.[c.key] ?? distinct(records, c.key)).map((v) => (
+        {(filterOptions?.[c.key] ?? distinct(records, c.key, c.type === 'multiselect')).map((v) => (
           <option key={v} value={v}>{v}</option>
         ))}
       </select>
@@ -1380,10 +1404,10 @@ export default function MindSheet({
 
       {editable &&
         gridCols
-          .filter((c) => c.type === 'select')
+          .filter((c) => c.type === 'select' || c.type === 'multiselect')
           .map((c) => (
             <datalist key={c.key} id={`dl-${c.key}`}>
-              {(filterOptions?.[c.key] ?? distinct(records, c.key)).map((v) => (
+              {(filterOptions?.[c.key] ?? distinct(records, c.key, c.type === 'multiselect')).map((v) => (
                 <option key={v} value={v} />
               ))}
             </datalist>
@@ -1750,6 +1774,36 @@ function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: 
       >
         {String(value)}
       </a>
+    );
+  }
+  // multiselect: one pill per tag. A filterable tag is a button — clicking it
+  // filters by that single tag (the host matches "contains").
+  if (col.type === 'multiselect') {
+    const tags = splitTags(value);
+    if (!tags.length) return <span className={styles.empty}>—</span>;
+    return (
+      <span className={styles.tags}>
+        {tags.map((tag) => {
+          const variant = col.badgeVariant?.[tag] ?? 'grey';
+          const cls = cx(styles.badge, styles[`badge_${variant}`]);
+          if (col.filterable && badge?.onFilter) {
+            const active = badge.activeValue === tag;
+            return (
+              <button
+                key={tag}
+                type="button"
+                className={cx(cls, styles.badgeBtn, active && styles.badgeActive)}
+                title={active ? s.clearFilter : s.filterByValue(tag)}
+                onClick={(e) => { e.stopPropagation(); badge.onFilter!(col.key, tag); }}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                {tag}
+              </button>
+            );
+          }
+          return <span key={tag} className={cls}>{tag}</span>;
+        })}
+      </span>
     );
   }
   if (col.badge) {

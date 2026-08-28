@@ -498,6 +498,14 @@
 }
 
 /* coloured status pills for select columns (verdict / popularity / grade) */
+/* multiselect cell: several pills that wrap within the cell */
+.tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
 .badge {
   display: inline-block;
   max-width: 100%;
