@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export type Cell = string | number | null;
 export type ColumnType = 'text' | 'number' | 'long-text' | 'url' | 'select' | 'multiselect' | 'date' | 'checkbox' | 'rating';
 
@@ -111,6 +113,9 @@ export interface MindSheetProps {
   /** when true only favourites are listed (host does the filtering) */
   favoritesOnly?: boolean;
   onFavoritesOnlyChange?: (only: boolean) => void;
+  /** host-rendered control(s) placed at the start of the toolbar, right after
+      the search box (e.g. a «Saved views» button that lives with Filters/View). */
+  toolbarLead?: ReactNode;
   /** Раскрывать строку карточкой сбоку: все поля целиком, включая длинный
       текст, которого в сетке нет вовсе. Так тесноту решают все не-табличные
       системы — не режимом отображения, а вторым уровнем интерфейса. */

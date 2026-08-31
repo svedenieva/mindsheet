@@ -206,7 +206,7 @@ export default function MindSheet({
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
   editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnsReorder,
-  defaultDisplay, forceDisplay, viewKey, strings, accent,
+  defaultDisplay, forceDisplay, viewKey, strings, accent, toolbarLead,
 }: MindSheetProps) {
   // надписи: переданные хостом поверх русских значений по умолчанию
   const S: MindSheetStrings = { ...DEFAULT_STRINGS, ...strings };
@@ -1038,7 +1038,7 @@ export default function MindSheet({
   // фильтры слева — не постоянной колонкой, а выпадашкой «Фильтры»: кнопка со
   // счётчиком активных, панель с теми же селектами раскрывается поверх таблицы.
   const activeFilterCount = Object.values(filterMap).filter((v) => v !== '' && v != null).length;
-  const filtersEl = filterables.length > 0 && (
+  const filtersEl = (filterables.length > 0 || onFavoritesOnlyChange) && (
     <div className={styles.viewMenu}>
       <button
         type="button"
@@ -1060,6 +1060,7 @@ export default function MindSheet({
             onKeyDown={(e) => { if (e.key === 'Escape') setFiltersOpen(false); }}
           >
             {filterEls}
+            {favEl && <div className={styles.favInFilters}>{favEl}</div>}
           </div>
         </>
       )}
@@ -1806,8 +1807,8 @@ export default function MindSheet({
         <div className={styles.withSidebar}>
           <aside className={styles.sidebar}>
             {searchEl}
+            {toolbarLead}
             {filtersEl}
-            {favEl}
             {displayEl}
             {sortResetEl}
             {resetEl}
@@ -1824,10 +1825,14 @@ export default function MindSheet({
     <div className={styles.sheet}>
       <div className={styles.tableTools}>
         {searchEl}
+        {/* host controls (e.g. «Views») sit right after the search, beside
+            Filters/View */}
+        {toolbarLead}
         {/* 'menu' collapses the filters into one «Фильтры» popover button so the
-            toolbar stays compact; 'top' keeps them inline as before */}
-        {filtersPosition === 'menu' ? filtersEl : filterEls}
-        {favEl}
+            toolbar stays compact; 'top' keeps them inline as before. The
+            «favorites only» toggle lives inside the Filters menu; in inline mode
+            it stays next to the filter selects. */}
+        {filtersPosition === 'menu' ? filtersEl : (<>{filterEls}{favEl}</>)}
         {displayEl}
         {sortResetEl}
         {resetEl}

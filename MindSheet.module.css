@@ -888,6 +888,13 @@
   cursor: pointer;
   white-space: nowrap;
 }
+/* «favorites only» toggle when it lives inside the Filters dropdown */
+.favInFilters {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+
 /* the checkbox itself IS the star: hide the native box, draw ☆ / ★ */
 .favInput {
   position: absolute;
