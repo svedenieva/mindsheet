@@ -188,6 +188,12 @@
   .sidebar .sideHead {
     display: none;
   }
+
+  /* responsive toolbar: search takes its own row, so «Фільтри» and «Вид» drop
+     onto the row below it instead of crowding the search line */
+  .tableTools .search {
+    flex: 1 1 100%;
+  }
 }
 
 /* the card: rounded, own scroll region, hairline ring + soft shadow
@@ -881,7 +887,30 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.favOnly input { accent-color: var(--sage); }
+/* the checkbox itself IS the star: hide the native box, draw ☆ / ★ */
+.favInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  margin: 0;
+}
+.favStar::before {
+  content: '☆';
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink-45);
+  transition: color 0.12s ease;
+}
+.favInput:checked + .favStar::before {
+  content: '★';
+  color: light-dark(#d99a2b, #e0b45f);
+}
+.favInput:focus-visible + .favStar::before {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 
 /* ── «Вид»: перенос текста, высота строки, ширины колонок ───────────── */
 .viewMenu {

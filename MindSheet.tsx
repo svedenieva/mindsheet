@@ -1020,10 +1020,12 @@ export default function MindSheet({
     <label className={styles.favOnly}>
       <input
         type="checkbox"
+        className={styles.favInput}
         checked={Boolean(favoritesOnly)}
         onChange={(e) => onFavoritesOnlyChange(e.target.checked)}
       />
-      ★ {S.favoritesOnly}
+      <span className={styles.favStar} aria-hidden="true" />
+      {S.favoritesOnly}
     </label>
   );
 
