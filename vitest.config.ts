@@ -10,6 +10,6 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     setupFiles: ['./vitest.setup.ts'],
-    include: ['multiselect.test.tsx'],
+    include: ['multiselect.test.tsx', 'select-picker.test.tsx'],
   },
 });

@@ -858,6 +858,9 @@ export default function MindSheet({
       commitOnBlur?: boolean;
       onCommit?: () => void;
       onCancel?: () => void;
+      /** commit a specific value in one gesture (badge pick), bypassing the
+          draft state that onCommit reads. */
+      onPick?: (v: string) => void;
     },
   ) => {
     // a checkbox commits on toggle — no separate «type then Enter» step
@@ -872,6 +875,71 @@ export default function MindSheet({
           onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); opts.onCancel?.(); } }}
         />
       );
+    }
+    // A select cell with a known option set becomes a one-click picker: every
+    // choice is shown up front as a badge, and a single click sets it — no
+    // dropdown, no typing. This is what makes flipping a status (Режим) or a
+    // stage (Стадия) effortless. `col.order` marks a closed vocabulary (only
+    // those values); otherwise the options are the values already in the column,
+    // plus a text field to enter a new one.
+    if (col.type === 'select') {
+      const closed = Array.isArray(col.order) && col.order.length > 0;
+      const options = [...new Set([...(col.order ?? []), ...distinct(records, col.key)])].filter(Boolean);
+      if (options.length > 0) {
+        const pick = (opt: string) => {
+          if (opts.onPick) opts.onPick(opt);
+          else { onInput(opt); opts.onCommit?.(); }
+        };
+        const pills = options.map((opt) => {
+          const variant = col.badgeVariant?.[opt] ?? 'grey';
+          const active = opt === value;
+          return (
+            <button
+              key={opt}
+              type="button"
+              className={cx(styles.badge, styles[`badge_${variant}`], styles.badgeBtn, active && styles.badgeActive)}
+              // commit on mousedown so it lands before any blur-to-cancel
+              onMouseDown={(e) => { e.preventDefault(); pick(opt); }}
+            >
+              {opt}
+            </button>
+          );
+        });
+        // closed vocab: a focusable shell so clicking away cancels cleanly
+        // (there is no text input to blur); open vocab: keep the text field.
+        if (closed) {
+          return (
+            <div
+              className={styles.pick}
+              tabIndex={-1}
+              ref={(el) => { if (el && opts.autoFocus) el.focus(); }}
+              onBlur={() => { if (opts.commitOnBlur) opts.onCancel?.(); }}
+              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); opts.onCancel?.(); } }}
+            >
+              <div className={styles.pickOpts}>{pills}</div>
+            </div>
+          );
+        }
+        return (
+          <div className={styles.pick}>
+            <div className={styles.pickOpts}>{pills}</div>
+            <input
+              className={styles.cellInput}
+              autoFocus={opts.autoFocus}
+              type="text"
+              list={`dl-${col.key}`}
+              placeholder={opts.placeholder}
+              value={value}
+              onChange={(e) => onInput(e.target.value)}
+              onBlur={opts.commitOnBlur ? opts.onCommit : undefined}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); opts.onCommit?.(); }
+                else if (e.key === 'Escape') { e.preventDefault(); opts.onCancel?.(); }
+              }}
+            />
+          </div>
+        );
+      }
     }
     const inputType = col.type === 'date' ? 'date' : col.type === 'rating' || col.type === 'number' ? 'number' : 'text';
     return (
@@ -1394,7 +1462,9 @@ export default function MindSheet({
                     c,
                     addDraft[c.key] ?? '',
                     (v) => setAddDraft((d) => ({ ...d, [c.key]: v })),
-                    { placeholder: c.label, onCommit: commitAdd },
+                    // picking a badge on the add-row just fills the draft; the
+                    // row is created by the + button / Enter, as with typing
+                    { placeholder: c.label, onCommit: commitAdd, onPick: (v) => setAddDraft((d) => ({ ...d, [c.key]: v })) },
                   )}
                 </div>
               ))}
@@ -1641,6 +1711,10 @@ export default function MindSheet({
                     commitOnBlur: true,
                     onCommit: () => commitEdit(r, c.key),
                     onCancel: () => setEditing(null),
+                    onPick: (v) => {
+                      setEditing(null);
+                      if (onCellEdit && v !== (r[c.key] == null ? '' : String(r[c.key]))) onCellEdit(r, c.key, v);
+                    },
                   })
                 : renderCell(r[c.key], c, search, {
                     activeValue: filterMap[c.key],
@@ -1685,6 +1759,10 @@ export default function MindSheet({
                       commitOnBlur: true,
                       onCommit: () => commitEdit(cardRow, c.key),
                       onCancel: () => setEditing(null),
+                      onPick: (v) => {
+                        setEditing(null);
+                        if (onCellEdit && v !== (cardRow[c.key] == null ? '' : String(cardRow[c.key]))) onCellEdit(cardRow, c.key, v);
+                      },
                     })
                   : hasValue(value)
                     ? renderCell(value, c, search, undefined, S, display.cellColors)

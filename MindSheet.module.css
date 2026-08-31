@@ -675,6 +675,27 @@
   outline: none;
 }
 
+/* one-click select picker: every choice shown as a badge, click to set it.
+   No dropdown, no typing — a status flips in a single tap. */
+.pick {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  margin: -2px 0;
+  outline: none;
+}
+.pick .badge {
+  cursor: pointer;
+  margin: 1px 3px 1px 0;
+}
+.pickOpts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
+
 /* date / checkbox / rating cells */
 .cellCheck {
   width: 15px;
