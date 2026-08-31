@@ -917,9 +917,7 @@
 .viewPanel {
   position: absolute;
   top: calc(100% + 6px);
-  /* the «Вид» button sits at the right of the toolbar, so open the panel to the
-     LEFT — anchoring left:0 pushed a 260px panel off the right edge (clipped) */
-  right: 0;
+  left: 0;
   z-index: 21;
   width: 260px;
   display: flex;
@@ -1094,9 +1092,13 @@
     padding: 11px 14px;
   }
 
-  /* панель вида шире экрана не вылезает */
+  /* панель вида шире экрана не вылезает; на узком экране кнопка «Вид» стоит
+     справа тулбара, поэтому открываем панель влево — иначе она вылезала за
+     правый край и обрезалась. Десктоп (>760px) не меняется. */
   .viewPanel {
     width: min(250px, calc(100vw - 32px));
+    left: auto;
+    right: 0;
   }
 
   /* шапка группы и её подсказка переносятся, а не режутся */
