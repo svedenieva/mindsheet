@@ -193,6 +193,7 @@
      onto the row below it instead of crowding the search line */
   .tableTools .search {
     flex: 1 1 100%;
+    max-width: none;
   }
 }
 
