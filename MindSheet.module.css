@@ -917,7 +917,9 @@
 .viewPanel {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  /* the «Вид» button sits at the right of the toolbar, so open the panel to the
+     LEFT — anchoring left:0 pushed a 260px panel off the right edge (clipped) */
+  right: 0;
   z-index: 21;
   width: 260px;
   display: flex;
