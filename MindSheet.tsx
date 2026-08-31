@@ -348,6 +348,24 @@ export default function MindSheet({
     const head = (e.currentTarget.parentElement as HTMLElement | null);
     const startWidth = head?.getBoundingClientRect().width ?? 120;
     const startX = e.clientX;
+
+    // Pin EVERY column to its current pixel width before the drag. Otherwise the
+    // columns still on fluid (fr) tracks soak up the freed space and visibly
+    // expand when you resize one — the user asked for the others to stay put.
+    // The header's data cells (.th) map 1:1 to gridCols; leading service cells
+    // are .caretCell and are skipped.
+    const heads = tableRef.current
+      ?.querySelector(`.${styles.tableHead}`)
+      ?.querySelectorAll<HTMLElement>(`.${styles.th}`);
+    if (heads) {
+      const frozen: Record<string, number> = {};
+      gridCols.forEach((c, i) => {
+        const cell = heads[i];
+        if (cell) frozen[c.key] = Math.round(cell.getBoundingClientRect().width);
+      });
+      // keep any width the user already set explicitly (d.widths wins)
+      setDisplay((d) => ({ ...d, widths: { ...frozen, ...d.widths } }));
+    }
     // тянуть можно и мимо ручки — события ловим на окне; заодно глушим
     // выделение текста, иначе протяжка выделяет заголовки соседних колонок
     const prevSelect = document.body.style.userSelect;
