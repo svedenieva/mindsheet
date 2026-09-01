@@ -245,6 +245,10 @@ export default function MindSheet({
 
   // свёрнутые группы авто-группировки (по значению сортируемой колонки)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // groups start COLLAPSED when a base opens or its grouping changes — you open
+  // them yourself. Tracks the grouping «signature» so a manual expand isn't
+  // undone on every re-render, only when the base / group column actually changes.
+  const groupSigRef = useRef<string | null>(null);
   const toggleGroup = (value: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -764,6 +768,16 @@ export default function MindSheet({
       if (n.children) collect(n.children);
     }
   })(groups);
+  // Default the groups collapsed when the grouping context changes (new base or
+  // new group column). Adjusting state during render (not an effect) avoids a
+  // flash of everything expanded before it collapses.
+  const groupSig = grouped ? `${viewKey ?? ''}|${levels.map((l) => l.key).join('>')}` : '';
+  if (grouped && groupSigRef.current !== groupSig) {
+    groupSigRef.current = groupSig;
+    setCollapsed(new Set(allPaths));
+  } else if (!grouped && groupSigRef.current !== null) {
+    groupSigRef.current = null;
+  }
   const allCollapsed = grouped && allPaths.length > 0 && allPaths.every((p) => collapsed.has(p));
   const levelsLabel = levels
     .map((l) => columns.find((c) => c.key === l.key)?.label ?? l.key)
