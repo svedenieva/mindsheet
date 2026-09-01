@@ -544,6 +544,31 @@ export default function MindSheet({
     setEditing(null);
     if (onCellEdit && draft !== (r[key] == null ? '' : String(r[key]))) onCellEdit(r, key, draft);
   };
+  // commit a value right away without leaving edit mode — used by the tag picker
+  // so each toggle saves immediately (no separate «done» step)
+  const liveEdit = (r: Row, key: string, v: string) => {
+    setDraft(v);
+    if (onCellEdit && v !== (r[key] == null ? '' : String(r[key]))) onCellEdit(r, key, v);
+  };
+
+  // click outside the open editor closes it (committing any typed draft). The
+  // grid's blur handling is unreliable when the editor is a focusable shell, so
+  // this is the dependable way to finish an edit by clicking away.
+  const editingCellRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!editing) return;
+    const onDown = (e: MouseEvent) => {
+      const cell = editingCellRef.current;
+      if (cell && !cell.contains(e.target as Node)) {
+        const r = records.find((x) => String(x.id) === editing.id);
+        if (r) commitEdit(r, editing.key);
+        else setEditing(null);
+      }
+    };
+    document.addEventListener('mousedown', onDown, true);
+    return () => document.removeEventListener('mousedown', onDown, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, records, draft]);
   const commitAdd = () => {
     if (onAddRow && Object.values(addDraft).some((v) => v.trim())) {
       onAddRow(addDraft);
@@ -893,6 +918,9 @@ export default function MindSheet({
       /** commit a specific value in one gesture (badge pick), bypassing the
           draft state that onCommit reads. */
       onPick?: (v: string) => void;
+      /** commit a value immediately WITHOUT leaving edit mode (tag picker: each
+          toggle saves, the editor stays open for more). */
+      onLive?: (v: string) => void;
     },
   ) => {
     // a checkbox commits on toggle — no separate «type then Enter» step
@@ -961,12 +989,13 @@ export default function MindSheet({
       }
     }
     // multiselect: toggle several tags at once (each click adds/removes), and a
-    // free text field to add any new tag. Stored comma-separated; commits on blur.
+    // free text field to add any new tag. Stored comma-separated. Each toggle
+    // saves immediately (onLive) — no separate «done» step; click away to close.
     if (col.type === 'multiselect') {
       const current = splitTags(value);
       const chosen = new Set(current);
       const options = [...new Set([...(col.order ?? []), ...distinct(records, col.key, true)])].filter(Boolean);
-      const setTags = (tags: string[]) => onInput([...new Set(tags.filter(Boolean))].join(', '));
+      const setTags = (tags: string[]) => (opts.onLive ?? onInput)([...new Set(tags.filter(Boolean))].join(', '));
       const toggle = (opt: string) => setTags(chosen.has(opt) ? current.filter((t) => t !== opt) : [...current, opt]);
       const addNew = (raw: string) => { const t = raw.trim(); if (t && !chosen.has(t)) setTags([...current, t]); };
       return (
@@ -995,22 +1024,11 @@ export default function MindSheet({
             type="text"
             list={`dl-${col.key}`}
             placeholder={opts.placeholder}
-            onBlur={opts.commitOnBlur ? opts.onCommit : undefined}
             onKeyDown={(e) => {
               if (e.key === 'Enter') { e.preventDefault(); addNew((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; }
-              else if (e.key === 'Escape') { e.preventDefault(); opts.onCommit?.(); }
+              else if (e.key === 'Escape' || e.key === 'Tab') { opts.onCommit?.(); }
             }}
           />
-          {/* explicit commit — a multi-pick editor can lose focus, so onBlur is
-              not a reliable commit; a button click always is */}
-          <button
-            type="button"
-            className={cx(styles.badge, styles.badge_green, styles.badgeBtn, styles.pickDone)}
-            title="OK"
-            onMouseDown={(e) => { e.preventDefault(); opts.onCommit?.(); }}
-          >
-            ✓
-          </button>
         </div>
       );
     }
@@ -1782,6 +1800,7 @@ export default function MindSheet({
               // stop the click bubbling to the row's onRowOpen — otherwise
               // starting an edit (or clicking a tag/select option while editing)
               // also opens the record page and throws the editor away
+              ref={editingThis ? editingCellRef : undefined}
               onClick={editable ? (e) => { e.stopPropagation(); if (!editingThis) startEdit(r, c.key); } : undefined}
               // keep editor keystrokes (Enter to commit, Space in a tag) from
               // bubbling to the row, whose Enter/Space opens the record page
@@ -1793,6 +1812,7 @@ export default function MindSheet({
                     commitOnBlur: true,
                     onCommit: () => commitEdit(r, c.key),
                     onCancel: () => setEditing(null),
+                    onLive: (v) => liveEdit(r, c.key, v),
                     onPick: (v) => {
                       setEditing(null);
                       if (onCellEdit && v !== (r[c.key] == null ? '' : String(r[c.key]))) onCellEdit(r, c.key, v);
