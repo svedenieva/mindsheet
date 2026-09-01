@@ -1738,7 +1738,10 @@ export default function MindSheet({
                 isCentered(c) && styles.center,
                 editable && styles.editableTd,
               )}
-              onClick={editable && !editingThis ? () => startEdit(r, c.key) : undefined}
+              // stop the click bubbling to the row's onRowOpen — otherwise
+              // starting an edit (or clicking a tag/select option while editing)
+              // also opens the record page and throws the editor away
+              onClick={editable ? (e) => { e.stopPropagation(); if (!editingThis) startEdit(r, c.key); } : undefined}
             >
               {editingThis
                 ? cellInput(c, draft, setDraft, {
