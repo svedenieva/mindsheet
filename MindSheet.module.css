@@ -702,6 +702,12 @@
   align-items: center;
   min-width: 0;
 }
+/* the multiselect «✓» commit button — sits under the add-tag field */
+.pickDone {
+  align-self: flex-start;
+  cursor: pointer;
+  font-weight: 700;
+}
 
 /* date / checkbox / rating cells */
 .cellCheck {

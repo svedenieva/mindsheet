@@ -915,7 +915,6 @@ export default function MindSheet({
     // those values); otherwise the options are the values already in the column,
     // plus a text field to enter a new one.
     if (col.type === 'select') {
-      const closed = Array.isArray(col.order) && col.order.length > 0;
       const options = [...new Set([...(col.order ?? []), ...distinct(records, col.key)])].filter(Boolean);
       if (options.length > 0) {
         const pick = (opt: string) => {
@@ -937,21 +936,9 @@ export default function MindSheet({
             </button>
           );
         });
-        // closed vocab: a focusable shell so clicking away cancels cleanly
-        // (there is no text input to blur); open vocab: keep the text field.
-        if (closed) {
-          return (
-            <div
-              className={styles.pick}
-              tabIndex={-1}
-              ref={(el) => { if (el && opts.autoFocus) el.focus(); }}
-              onBlur={() => { if (opts.commitOnBlur) opts.onCancel?.(); }}
-              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); opts.onCancel?.(); } }}
-            >
-              <div className={styles.pickOpts}>{pills}</div>
-            </div>
-          );
-        }
+        // Always keep a text field alongside the badges — even for a closed
+        // vocabulary (col.order) — so any value can be typed, not only the
+        // preset ones. Pick a badge for the common case; type for anything else.
         return (
           <div className={styles.pick}>
             <div className={styles.pickOpts}>{pills}</div>
@@ -972,6 +959,60 @@ export default function MindSheet({
           </div>
         );
       }
+    }
+    // multiselect: toggle several tags at once (each click adds/removes), and a
+    // free text field to add any new tag. Stored comma-separated; commits on blur.
+    if (col.type === 'multiselect') {
+      const current = splitTags(value);
+      const chosen = new Set(current);
+      const options = [...new Set([...(col.order ?? []), ...distinct(records, col.key, true)])].filter(Boolean);
+      const setTags = (tags: string[]) => onInput([...new Set(tags.filter(Boolean))].join(', '));
+      const toggle = (opt: string) => setTags(chosen.has(opt) ? current.filter((t) => t !== opt) : [...current, opt]);
+      const addNew = (raw: string) => { const t = raw.trim(); if (t && !chosen.has(t)) setTags([...current, t]); };
+      return (
+        <div className={styles.pick}>
+          <div className={styles.pickOpts}>
+            {options.map((opt) => {
+              const variant = col.badgeVariant?.[opt] ?? 'grey';
+              const active = chosen.has(opt);
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  // mousedown + preventDefault so the badge toggles without
+                  // stealing focus from the input (whose blur commits)
+                  className={cx(styles.badge, styles[`badge_${variant}`], styles.badgeBtn, active && styles.badgeActive)}
+                  onMouseDown={(e) => { e.preventDefault(); toggle(opt); }}
+                >
+                  {active ? '✓ ' : ''}{opt}
+                </button>
+              );
+            })}
+          </div>
+          <input
+            className={styles.cellInput}
+            autoFocus={opts.autoFocus}
+            type="text"
+            list={`dl-${col.key}`}
+            placeholder={opts.placeholder}
+            onBlur={opts.commitOnBlur ? opts.onCommit : undefined}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); addNew((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; }
+              else if (e.key === 'Escape') { e.preventDefault(); opts.onCommit?.(); }
+            }}
+          />
+          {/* explicit commit — a multi-pick editor can lose focus, so onBlur is
+              not a reliable commit; a button click always is */}
+          <button
+            type="button"
+            className={cx(styles.badge, styles.badge_green, styles.badgeBtn, styles.pickDone)}
+            title="OK"
+            onMouseDown={(e) => { e.preventDefault(); opts.onCommit?.(); }}
+          >
+            ✓
+          </button>
+        </div>
+      );
     }
     const inputType = col.type === 'date' ? 'date' : col.type === 'rating' || col.type === 'number' ? 'number' : 'text';
     return (
@@ -1742,6 +1783,9 @@ export default function MindSheet({
               // starting an edit (or clicking a tag/select option while editing)
               // also opens the record page and throws the editor away
               onClick={editable ? (e) => { e.stopPropagation(); if (!editingThis) startEdit(r, c.key); } : undefined}
+              // keep editor keystrokes (Enter to commit, Space in a tag) from
+              // bubbling to the row, whose Enter/Space opens the record page
+              onKeyDown={editable ? (e) => e.stopPropagation() : undefined}
             >
               {editingThis
                 ? cellInput(c, draft, setDraft, {
