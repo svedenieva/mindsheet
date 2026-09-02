@@ -1041,7 +1041,6 @@ export default function MindSheet({
         min={col.type === 'rating' ? 0 : undefined}
         max={col.type === 'rating' ? 5 : undefined}
         step={col.type === 'rating' ? 1 : undefined}
-        list={col.type === 'select' || col.type === 'multiselect' ? `dl-${col.key}` : undefined}
         placeholder={opts.placeholder}
         value={value}
         onChange={(e) => onInput(e.target.value)}
