@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
-import type { AggKind, CellFormat, ColumnDef, ColumnType, MindSheetProps, MindSheetStrings, NumberFormat, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
+import type { AggKind, CellBorder, CellFormat, ColumnDef, ColumnType, MindSheetProps, MindSheetStrings, NumberFormat, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
 import styles from './MindSheet.module.css';
 
 // Надписи по умолчанию — русские. Хост может переопределить любую через проп
@@ -71,6 +71,17 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   tbAlignRight: 'По правому краю',
   tbClearFormat: 'Очистить формат',
   tbNoColor: 'Без цвета',
+  tbBorders: 'Границы',
+  tbBorderAll: 'Все границы',
+  tbBorderNone: 'Нет границ',
+  tbBorderTop: 'Верхняя',
+  tbBorderBottom: 'Нижняя',
+  tbBorderLeft: 'Левая',
+  tbBorderRight: 'Правая',
+  noteAdd: 'Примечание…',
+  notePlaceholder: 'Текст примечания…',
+  noteSave: 'Сохранить',
+  noteDelete: 'Удалить',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -157,6 +168,30 @@ const FMT_FONTS: Array<{ v: string; label: string }> = [
 ];
 const FMT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 40];
 const FMT_PALETTE = ['#111827', '#dc2626', '#ea580c', '#f59e0b', '#16a34a', '#0891b2', '#2563eb', '#7c3aed', '#db2777', '#6b7280', '#ffffff'];
+
+// компактные иконки панели форматирования (как в Office)
+const svg = (children: ReactElement | ReactElement[], vb = '0 0 24 24'): ReactElement => (
+  <svg width="15" height="15" viewBox={vb} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
+);
+const IC = {
+  bold: (<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4h6a4 4 0 0 1 0 8H7zM7 12h7a4 4 0 0 1 0 8H7z" stroke="currentColor" strokeWidth="1.5" fill="none"/></svg>),
+  italic: svg(<><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></>),
+  underline: svg(<><path d="M6 3v7a6 6 0 0 0 12 0V3"/><line x1="4" y1="21" x2="20" y2="21"/></>),
+  alignLeft: svg(<><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></>),
+  alignCenter: svg(<><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></>),
+  alignRight: svg(<><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="6" y1="18" x2="20" y2="18"/></>),
+  fill: svg(<><path d="M4 15l7-11 7 11z"/><path d="M4 15h14"/><circle cx="20" cy="18" r="1.5" fill="currentColor" stroke="none"/></>),
+  borders: svg(<><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></>),
+  clear: svg(<><path d="M4 7h16"/><path d="M10 11l4 6M14 11l-4 6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/></>),
+};
+const BORDER_PRESETS: Array<{ key: string; border: CellBorder }> = [
+  { key: 'tbBorderAll', border: { top: true, right: true, bottom: true, left: true } },
+  { key: 'tbBorderBottom', border: { bottom: true } },
+  { key: 'tbBorderTop', border: { top: true } },
+  { key: 'tbBorderLeft', border: { left: true } },
+  { key: 'tbBorderRight', border: { right: true } },
+  { key: 'tbBorderNone', border: {} },
+];
 
 // ширина хвостового трека под кнопку «+ колонка»
 const ADD_COL_TRACK = 40;
@@ -284,7 +319,7 @@ export default function MindSheet({
   editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset, onSortsSet, groupBy, onGroupBySet,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
-  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnFormat, onColumnsReorder, cellSelection, cellFormats, onCellFormat, onBulkEdit,
+  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnFormat, onColumnsReorder, cellSelection, cellFormats, onCellFormat, onBulkEdit, cellNotes, onCellNote,
   defaultDisplay, forceDisplay, viewKey, strings, accent, toolbarLead,
 }: MindSheetProps) {
   // надписи: переданные хостом поверх русских значений по умолчанию
@@ -790,7 +825,9 @@ export default function MindSheet({
     });
 
   // ── панель форматирования (как группа «Шрифт» в Excel/Word) ──────────
-  const [palette, setPalette] = useState<null | 'fill' | 'color'>(null);
+  const [palette, setPalette] = useState<null | 'fill' | 'color' | 'border'>(null);
+  // редактор примечания к клетке (ТР-МШ-16)
+  const [noteEdit, setNoteEdit] = useState<null | { id: string; key: string; x: number; y: number; draft: string }>(null);
   useEffect(() => {
     if (!palette) return;
     const close = () => setPalette(null);
@@ -1700,16 +1737,16 @@ export default function MindSheet({
           <option value="">–</option>
           {FMT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <button type="button" className={styles.fmtBtn} title={S.tbBigger} onClick={() => bump(1)}>A<sup>▲</sup></button>
-        <button type="button" className={styles.fmtBtn} title={S.tbSmaller} onClick={() => bump(-1)}>A<sub>▼</sub></button>
+        <button type="button" className={styles.fmtBtn} title={S.tbBigger} onClick={() => bump(1)}><span className={styles.fmtAsz}>A▲</span></button>
+        <button type="button" className={styles.fmtBtn} title={S.tbSmaller} onClick={() => bump(-1)}><span className={styles.fmtAszSm}>A▼</span></button>
         <span className={styles.fmtDiv} />
-        <button type="button" className={cx(styles.fmtBtn, styles.fmtBold, allBold && styles.fmtOn)} title={S.menuBold} onClick={() => applyFmt({ bold: !allBold })}>B</button>
-        <button type="button" className={cx(styles.fmtBtn, styles.fmtItalic, allItalic && styles.fmtOn)} title={S.menuItalic} onClick={() => applyFmt({ italic: !allItalic })}>I</button>
-        <button type="button" className={cx(styles.fmtBtn, styles.fmtUnder, allUnder && styles.fmtOn)} title={S.menuUnderline} onClick={() => applyFmt({ underline: !allUnder })}>U</button>
+        <button type="button" className={cx(styles.fmtBtn, allBold && styles.fmtOn)} title={S.menuBold} onClick={() => applyFmt({ bold: !allBold })}>{IC.bold}</button>
+        <button type="button" className={cx(styles.fmtBtn, allItalic && styles.fmtOn)} title={S.menuItalic} onClick={() => applyFmt({ italic: !allItalic })}>{IC.italic}</button>
+        <button type="button" className={cx(styles.fmtBtn, allUnder && styles.fmtOn)} title={S.menuUnderline} onClick={() => applyFmt({ underline: !allUnder })}>{IC.underline}</button>
         <span className={styles.fmtDiv} />
         <span className={styles.fmtPop}>
           <button type="button" className={styles.fmtBtn} title={S.tbFill} onClick={() => setPalette(palette === 'fill' ? null : 'fill')}>
-            <span className={styles.fmtBucket}>▩</span><span className={styles.fmtBar2} />
+            {IC.fill}<span className={styles.fmtBar2} />
           </button>
           {palette === 'fill' && (
             <span className={styles.fmtSwatches}>
@@ -1729,12 +1766,24 @@ export default function MindSheet({
             </span>
           )}
         </span>
+        <span className={styles.fmtPop}>
+          <button type="button" className={styles.fmtBtn} title={S.tbBorders} onClick={() => setPalette(palette === 'border' ? null : 'border')}>{IC.borders}</button>
+          {palette === 'border' && (
+            <span className={styles.fmtMenu}>
+              {BORDER_PRESETS.map((b) => (
+                <button key={b.key} type="button" className={styles.fmtMenuItem} onClick={() => { applyFmt({ border: b.border }); setPalette(null); }}>
+                  {S[b.key as keyof MindSheetStrings] as string}
+                </button>
+              ))}
+            </span>
+          )}
+        </span>
         <span className={styles.fmtDiv} />
-        <button type="button" className={cx(styles.fmtBtn, curAlign === 'left' && styles.fmtOn)} title={S.tbAlignLeft} onClick={() => applyFmt({ align: 'left' })}>⯀≡</button>
-        <button type="button" className={cx(styles.fmtBtn, curAlign === 'center' && styles.fmtOn)} title={S.tbAlignCenter} onClick={() => applyFmt({ align: 'center' })}>≡</button>
-        <button type="button" className={cx(styles.fmtBtn, curAlign === 'right' && styles.fmtOn)} title={S.tbAlignRight} onClick={() => applyFmt({ align: 'right' })}>≡⯀</button>
+        <button type="button" className={cx(styles.fmtBtn, curAlign === 'left' && styles.fmtOn)} title={S.tbAlignLeft} onClick={() => applyFmt({ align: 'left' })}>{IC.alignLeft}</button>
+        <button type="button" className={cx(styles.fmtBtn, curAlign === 'center' && styles.fmtOn)} title={S.tbAlignCenter} onClick={() => applyFmt({ align: 'center' })}>{IC.alignCenter}</button>
+        <button type="button" className={cx(styles.fmtBtn, curAlign === 'right' && styles.fmtOn)} title={S.tbAlignRight} onClick={() => applyFmt({ align: 'right' })}>{IC.alignRight}</button>
         <span className={styles.fmtDiv} />
-        <button type="button" className={styles.fmtBtn} title={S.tbClearFormat} onClick={() => applyFmt({ bold: false, italic: false, underline: false, fontPx: 0, fontFamily: '', color: '', fill: '', align: 'left' })}>⌫</button>
+        <button type="button" className={styles.fmtBtn} title={S.tbClearFormat} onClick={() => applyFmt({ bold: false, italic: false, underline: false, fontPx: 0, fontFamily: '', color: '', fill: '', align: 'left', border: {} })}>{IC.clear}</button>
       </div>
     );
   })() : null;
@@ -2221,10 +2270,54 @@ export default function MindSheet({
               </>
             );
           })()}
+          {onCellNote && ctxMenu.row && (
+            <>
+              <div className={styles.ctxSep} />
+              <button
+                type="button"
+                className={styles.ctxItem}
+                onClick={() => {
+                  const rr = ctxMenu.row!;
+                  const key = ctxMenu.col;
+                  setCtxMenu(null);
+                  setNoteEdit({ id: String(rr.id), key, x: ctxMenu.x, y: ctxMenu.y, draft: cellNotes?.[String(rr.id)]?.[key] ?? '' });
+                }}
+              >
+                {S.noteAdd}
+              </button>
+            </>
+          )}
           <div className={styles.ctxSep} />
           <button type="button" className={styles.ctxItem} disabled={gridCols.length <= 1} onClick={() => { toggleHidden(ctxMenu.col); setCtxMenu(null); }}>
             {S.hideColumn}
           </button>
+        </div>
+      )}
+
+      {noteEdit && (
+        <div
+          className={styles.notePop}
+          style={{ left: Math.min(noteEdit.x, (typeof window !== 'undefined' ? window.innerWidth : 9999) - 280), top: noteEdit.y + 8 }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <textarea
+            className={styles.noteArea}
+            autoFocus
+            value={noteEdit.draft}
+            placeholder={S.notePlaceholder}
+            onChange={(e) => setNoteEdit({ ...noteEdit, draft: e.target.value })}
+          />
+          <div className={styles.noteBtns}>
+            <button type="button" className={styles.noteSave} onClick={() => { onCellNote?.(noteEdit.id, noteEdit.key, noteEdit.draft.trim()); setNoteEdit(null); }}>
+              {S.noteSave}
+            </button>
+            {(cellNotes?.[noteEdit.id]?.[noteEdit.key]) && (
+              <button type="button" className={styles.noteDel} onClick={() => { onCellNote?.(noteEdit.id, noteEdit.key, ''); setNoteEdit(null); }}>
+                {S.noteDelete}
+              </button>
+            )}
+            <button type="button" className={styles.noteClose} onClick={() => setNoteEdit(null)} aria-label={S.close}>×</button>
+          </div>
         </div>
       )}
 
@@ -2463,6 +2556,14 @@ export default function MindSheet({
           if (cf?.color) cellStyle.color = cf.color;
           if (cf?.fill) cellStyle.background = cf.fill;
           if (cf?.align) cellStyle.textAlign = cf.align;
+          if (cf?.border) {
+            const bd = '1px solid var(--ink-45, #6b7280)';
+            if (cf.border.top) cellStyle.borderTop = bd;
+            if (cf.border.right) cellStyle.borderRight = bd;
+            if (cf.border.bottom) cellStyle.borderBottom = bd;
+            if (cf.border.left) cellStyle.borderLeft = bd;
+          }
+          const note = cellNotes?.[String(r.id)]?.[c.key];
           if (selected && selRect) {
             // синий диапазон с рамкой по краям прямоугольника — как в Google Таблицах
             const edges: string[] = [];
@@ -2536,6 +2637,16 @@ export default function MindSheet({
                     activeValue: filterMap[c.key],
                     onFilter: toggleFilter,
                   }, S, display.cellColors)}
+              {note !== undefined && (
+                <button
+                  type="button"
+                  className={styles.noteFlag}
+                  title={note}
+                  aria-label={note}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); setNoteEdit({ id: String(r.id), key: c.key, x: e.clientX, y: e.clientY, draft: note }); }}
+                />
+              )}
             </div>
           );
         })}

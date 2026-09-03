@@ -55,6 +55,15 @@ export interface CellFormat {
   fill?: string;
   /** выравнивание текста в клетке */
   align?: 'left' | 'center' | 'right';
+  /** границы клетки (как «Границы» в Excel) */
+  border?: CellBorder;
+}
+
+export interface CellBorder {
+  top?: boolean;
+  right?: boolean;
+  bottom?: boolean;
+  left?: boolean;
 }
 
 export interface SortState {
@@ -211,6 +220,11 @@ export interface MindSheetProps {
       Хост применяет и предлагает отмену. Когда задан — в контекстном меню
       появляются «Заполнить значением…» и «Очистить». */
   onBulkEdit?: (edits: Array<{ id: string; key: string; value: string }>) => void;
+  /** примечания к клеткам (ТР-МШ-16): rowId → ключ колонки → текст примечания.
+      Клетка с примечанием получает уголок-индикатор; клик показывает текст. */
+  cellNotes?: Record<string, Record<string, string>>;
+  /** добавить/изменить/удалить примечание клетки (пустой текст = удалить) */
+  onCellNote?: (rowId: string, colKey: string, text: string) => void;
   /** новый порядок колонок (полный список ключей грид-колонок) */
   onColumnsReorder?: (keys: string[]) => void;
 
@@ -330,6 +344,17 @@ export interface MindSheetStrings {
   tbAlignRight: string;
   tbClearFormat: string;
   tbNoColor: string;
+  tbBorders: string;
+  tbBorderAll: string;
+  tbBorderNone: string;
+  tbBorderTop: string;
+  tbBorderBottom: string;
+  tbBorderLeft: string;
+  tbBorderRight: string;
+  noteAdd: string;
+  notePlaceholder: string;
+  noteSave: string;
+  noteDelete: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;
