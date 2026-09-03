@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
-import type { AggKind, ColumnDef, ColumnType, MindSheetProps, MindSheetStrings, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
+import type { AggKind, ColumnDef, ColumnType, MindSheetProps, MindSheetStrings, NumberFormat, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
 import styles from './MindSheet.module.css';
 
 // Надписи по умолчанию — русские. Хост может переопределить любую через проп
@@ -42,6 +42,10 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   sortAsc: '↑ А–Я', sortDesc: '↓ Я–А', sortUp: 'Выше', sortDown: 'Ниже', sortRemove: 'Убрать',
   sortAddLevel: 'Добавить уровень', sortReset: 'Сбросить',
   groupHead: 'Группировать по', groupEmpty: 'Без группировки', groupAddLevel: 'Добавить группировку', sortByHead: 'Сортировать по',
+  hideColumn: 'Скрыть колонку', columnsHead: 'Колонки',
+  numFormatHead: 'Формат числа',
+  numFmtPlain: 'Обычное', numFmtThousands: 'Разряды 1 234', numFmtCurrency: 'Валюта', numFmtPercent: 'Проценты',
+  numDecimalsHead: 'Знаков после запятой',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -240,7 +244,7 @@ export default function MindSheet({
   editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset, onSortsSet, groupBy, onGroupBySet,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
-  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnsReorder,
+  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnFormat, onColumnsReorder,
   defaultDisplay, forceDisplay, viewKey, strings, accent, toolbarLead,
 }: MindSheetProps) {
   // надписи: переданные хостом поверх русских значений по умолчанию
@@ -643,8 +647,17 @@ export default function MindSheet({
     else onFilterChange?.(undefined);
     onSearchChange?.('');
   };
-  const gridCols = columns.filter((c) => c.type !== 'long-text');
+  // all columns that CAN sit in the grid (long-text lives on the record page),
+  // then the visible set with the manually-hidden ones removed
+  const allCols = columns.filter((c) => c.type !== 'long-text');
+  const hiddenKeys = display.hidden ?? [];
+  const gridCols = allCols.filter((c) => !hiddenKeys.includes(c.key));
   const firstKey = gridCols[0]?.key;
+  const toggleHidden = (key: string) =>
+    setDisplay((d) => {
+      const cur = d.hidden ?? [];
+      return { ...d, hidden: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key] };
+    });
   const rowsClickable = Boolean(onRowOpen);
 
   // Ручной порядок строк доступен только в «естественном» порядке: без
@@ -1309,6 +1322,19 @@ export default function MindSheet({
               <div className={styles.viewNote}>{S.rowHeightNote}</div>
             )}
 
+            <div className={styles.viewHead}>{S.columnsHead}</div>
+            {allCols.map((c) => (
+              <label key={c.key} className={styles.viewToggle}>
+                <input
+                  type="checkbox"
+                  checked={!hiddenKeys.includes(c.key)}
+                  disabled={!hiddenKeys.includes(c.key) && gridCols.length <= 1}
+                  onChange={() => toggleHidden(c.key)}
+                />
+                {c.label}
+              </label>
+            ))}
+
             <label className={styles.viewToggle}>
               <input
                 type="checkbox"
@@ -1513,6 +1539,48 @@ export default function MindSheet({
                           {S.resetWidth}
                         </button>
                       )}
+                      {c.type === 'number' && onColumnFormat && (() => {
+                        const fmt = c.numberFormat ?? {};
+                        const style = fmt.style ?? 'plain';
+                        const decimals = fmt.decimals ?? 0;
+                        const opts: Array<{ id: NumberFormat['style']; label: string }> = [
+                          { id: 'plain', label: S.numFmtPlain },
+                          { id: 'thousands', label: S.numFmtThousands },
+                          { id: 'currency', label: S.numFmtCurrency },
+                          { id: 'percent', label: S.numFmtPercent },
+                        ];
+                        return (
+                          <>
+                            <div className={styles.colMenuHead}>{S.numFormatHead}</div>
+                            {opts.map((o) => (
+                              <button
+                                key={o.id}
+                                type="button"
+                                className={cx(styles.colMenuItem, style === o.id && styles.colMenuItemOn)}
+                                onClick={() => onColumnFormat(c.key, { style: o.id, decimals, currency: fmt.currency })}
+                              >
+                                {o.label}{style === o.id ? ' ✓' : ''}
+                              </button>
+                            ))}
+                            <div className={styles.colMenuHead}>{S.numDecimalsHead}</div>
+                            <div className={styles.colMenuDecimals}>
+                              {[0, 1, 2, 3].map((d) => (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  className={cx(styles.colMenuDecBtn, decimals === d && styles.colMenuItemOn)}
+                                  onClick={() => onColumnFormat(c.key, { style, decimals: d, currency: fmt.currency })}
+                                >
+                                  {d}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()}
+                      <button type="button" className={styles.colMenuItem} disabled={gridCols.length <= 1} onClick={() => { toggleHidden(c.key); setColMenu(null); }}>
+                        {S.hideColumn}
+                      </button>
                       <button
                         type="button"
                         className={cx(styles.colMenuItem, styles.colMenuDanger)}
@@ -2048,6 +2116,24 @@ interface BadgeCtx {
   onFilter?: (key: string, value: string) => void;
 }
 
+// Форматирование числа по настройке колонки (см. NumberFormat). Проценты и
+// валюта НЕ пересчитывают значение — 45 → «45 %», 1200 → «$1 200»: пользователь
+// вводит уже готовое число, формат лишь одевает его.
+function formatNumber(value: Row[string], fmt: NumberFormat): string {
+  const n = Number(value);
+  if (!isFinite(n)) return String(value);
+  const decimals = Math.min(Math.max(fmt.decimals ?? 0, 0), 4);
+  const grouping = fmt.style === 'thousands' || fmt.style === 'currency';
+  const body = n.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+    useGrouping: grouping,
+  });
+  if (fmt.style === 'currency') return `${fmt.currency || '$'}${body}`;
+  if (fmt.style === 'percent') return `${body}%`;
+  return body;
+}
+
 function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: BadgeCtx, s: MindSheetStrings = DEFAULT_STRINGS, colorByValue = false) {
   // a checkbox is never «empty» — it's ticked or not, so it renders before the
   // blank-value check (read-only here; clicking the cell opens the real toggle)
@@ -2142,6 +2228,10 @@ function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: 
         {String(value)}
       </span>
     );
+  }
+  // числовая колонка с заданным форматом — разряды / валюта / проценты
+  if (col.type === 'number' && col.numberFormat) {
+    return <span className={styles.numCell}>{formatNumber(value, col.numberFormat)}</span>;
   }
   return highlight(String(value), query);
 }

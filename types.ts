@@ -3,12 +3,25 @@ import type { ReactNode } from 'react';
 export type Cell = string | number | null;
 export type ColumnType = 'text' | 'number' | 'long-text' | 'url' | 'select' | 'multiselect' | 'date' | 'checkbox' | 'rating';
 
+/** Формат отображения числовой колонки (как «Формат → Число» в Google Таблицах).
+    plain — как есть, thousands — разряды 1 234, currency — символ + разряды,
+    percent — число со знаком «%». decimals задаёт знаки после запятой. */
+export interface NumberFormat {
+  style?: 'plain' | 'thousands' | 'currency' | 'percent';
+  /** 0..4 знаков после запятой */
+  decimals?: number;
+  /** символ валюты-префикс для style:'currency' (по умолчанию «$») */
+  currency?: string;
+}
+
 export interface ColumnDef {
   key: string;
   label: string;
   type: ColumnType;
   sortable?: boolean;
   filterable?: boolean;
+  /** формат чисел — только для type:'number' */
+  numberFormat?: NumberFormat;
   /** explicit sort order for select values (e.g. importance), most-first.
      Values not listed sort after listed ones. */
   order?: string[];
@@ -56,6 +69,8 @@ export interface ViewDisplay {
   freezeFirst?: boolean;
   /** тонировать ячейки select-колонок по значению. Выкл по умолчанию. */
   cellColors?: boolean;
+  /** ключи скрытых колонок — не показываются в сетке (управляется вручную). */
+  hidden?: string[];
 }
 
 export interface FilterState {
@@ -142,6 +157,8 @@ export interface MindSheetProps {
   onColumnRetype?: (key: string, type: ColumnType) => void;
   /** удалить колонку */
   onColumnDelete?: (key: string) => void;
+  /** сменить формат отображения числовой колонки */
+  onColumnFormat?: (key: string, format: NumberFormat) => void;
   /** новый порядок колонок (полный список ключей грид-колонок) */
   onColumnsReorder?: (keys: string[]) => void;
 
@@ -228,6 +245,14 @@ export interface MindSheetStrings {
   groupEmpty: string;
   groupAddLevel: string;
   sortByHead: string;
+  hideColumn: string;
+  columnsHead: string;
+  numFormatHead: string;
+  numFmtPlain: string;
+  numFmtThousands: string;
+  numFmtCurrency: string;
+  numFmtPercent: string;
+  numDecimalsHead: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;
