@@ -41,6 +41,7 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   sortGroupHead: 'Группировка и сортировка', sortEmpty: 'Уровней нет — обычный порядок',
   sortAsc: '↑ А–Я', sortDesc: '↓ Я–А', sortUp: 'Выше', sortDown: 'Ниже', sortRemove: 'Убрать',
   sortAddLevel: 'Добавить уровень', sortReset: 'Сбросить',
+  groupHead: 'Группировать по', groupEmpty: 'Без группировки', groupAddLevel: 'Добавить группировку', sortByHead: 'Сортировать по',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -177,6 +178,36 @@ function distinct(records: Row[], key: string, multi = false): string[] {
   return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
 }
 
+// Multi-level row sort, independent of grouping. Respects a column's explicit
+// `order`, numeric/rating columns as numbers, else locale text; empties sink to
+// the bottom regardless of direction; the original index is the stable tiebreak.
+function sortRows(rows: Row[], levels: SortState[], columns: ColumnDef[]): Row[] {
+  if (!levels.length) return rows;
+  const colOf = new Map(columns.map((c) => [c.key, c]));
+  return rows
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => {
+      for (const lv of levels) {
+        const col = colOf.get(lv.key);
+        const dir = lv.dir === 'desc' ? -1 : 1;
+        const av = a.r[lv.key];
+        const bv = b.r[lv.key];
+        const ae = !hasValue(av);
+        const be = !hasValue(bv);
+        if (ae && be) continue;
+        if (ae) return 1;
+        if (be) return -1;
+        let c: number;
+        if (col?.order) c = col.order.indexOf(String(av)) - col.order.indexOf(String(bv));
+        else if (col?.type === 'number' || col?.type === 'rating') c = Number(av) - Number(bv);
+        else c = String(av).localeCompare(String(bv), 'ru');
+        if (c !== 0) return c * dir;
+      }
+      return a.i - b.i;
+    })
+    .map((d) => d.r);
+}
+
 // short columns live in the grid; long-text columns are shown on the record's
 // own page (opened via onRowOpen), so they stay out of the table entirely.
 // Tracks are fluid (fr, min 0) so the whole grid always fits the page width —
@@ -206,7 +237,7 @@ export default function MindSheet({
   columns, records, total, loading, filtersPosition = 'top',
   sort, filter, filters, filterOptions, search,
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
-  editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset, onSortsSet,
+  editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset, onSortsSet, groupBy, onGroupBySet,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
   editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnsReorder,
@@ -706,6 +737,15 @@ export default function MindSheet({
   const levels: SortState[] = (sorts?.length ? sorts : sort ? [sort] : []).slice(0, 3);
   const nameKey = gridCols[0]?.key;
 
+  // rows in display order: a manual drag order wins; otherwise sort by the sort
+  // levels (independent of grouping — Google-Sheets style)
+  const displayRecords = localOrder && canReorderRows ? orderedRecords : sortRows(records, levels, columns);
+
+  // GROUP levels are separate from SORT: use explicit groupBy when the host gives
+  // it (even empty), else fall back to the sort levels while autoGroup is on
+  const groupKeys: string[] = groupBy !== undefined ? groupBy : autoGroup ? levels.map((l) => l.key) : [];
+  const groupLevels: SortState[] = groupKeys.slice(0, 3).map((k) => ({ key: k, dir: levels.find((l) => l.key === k)?.dir ?? 'asc' }));
+
   // Значения ячейки для группировки. Мультиселект держит в ячейке массив, и
   // раньше он проходил через String() — теги склеивались в одну бессмысленную
   // группу «Популярность,Вердикт», которой не соответствует ни один фильтр.
@@ -729,7 +769,7 @@ export default function MindSheet({
   };
 
   function buildGroups(rows: Row[], depth: number, prefix: string): GroupNode[] {
-    const level = levels[depth];
+    const level = groupLevels[depth];
     const col = columns.find((c) => c.key === level.key);
     const dir = level.dir === 'desc' ? -1 : 1;
     const map = new Map<string, Row[]>();
@@ -748,7 +788,7 @@ export default function MindSheet({
     const out: GroupNode[] = [];
     for (const [value, bucket] of map) {
       const path = prefix ? prefix + ' / ' + value : value;
-      const deeper = depth + 1 < levels.length;
+      const deeper = depth + 1 < groupLevels.length;
       const label = col?.label ?? level.key;
       if (deeper) {
         out.push({
@@ -761,12 +801,8 @@ export default function MindSheet({
           rows: [],
         });
       } else {
-        const sorted = nameKey
-          ? [...bucket].sort((a, b) =>
-              String(a[nameKey] ?? '').localeCompare(String(b[nameKey] ?? ''), 'ru'),
-            )
-          : bucket;
-        out.push({ path, value, label, depth, count: bucket.length, children: null, rows: sorted });
+        // bucket already preserves the sort order of displayRecords
+        out.push({ path, value, label, depth, count: bucket.length, children: null, rows: bucket });
       }
     }
     out.sort((a, b) => {
@@ -779,7 +815,7 @@ export default function MindSheet({
     return out;
   }
 
-  const groups: GroupNode[] = autoGroup && levels.length ? buildGroups(records, 0, '') : [];
+  const groups: GroupNode[] = groupLevels.length ? buildGroups(displayRecords, 0, '') : [];
   // сколько раз строки вообще показываются: с мультиселектом одна запись
   // попадает в несколько групп, поэтому сравнивать с records.length нельзя —
   // две записи с четырьмя разными тегами дали бы 4 группы > 2 строк, и
@@ -801,7 +837,7 @@ export default function MindSheet({
   // Default the groups collapsed when the grouping context changes (new base or
   // new group column). Adjusting state during render (not an effect) avoids a
   // flash of everything expanded before it collapses.
-  const groupSig = grouped ? `${viewKey ?? ''}|${levels.map((l) => l.key).join('>')}` : '';
+  const groupSig = grouped ? `${viewKey ?? ''}|${groupLevels.map((l) => l.key).join('>')}` : '';
   if (grouped && groupSigRef.current !== groupSig) {
     groupSigRef.current = groupSig;
     setCollapsed(new Set(allPaths));
@@ -831,7 +867,7 @@ export default function MindSheet({
       }
     })(groups);
   } else {
-    for (const r of orderedRecords) items.push({ kind: 'row', row: r, path: '' });
+    for (const r of displayRecords) items.push({ kind: 'row', row: r, path: '' });
   }
 
   // ── окно видимых строк ──────────────────────────────────────────────
@@ -1153,6 +1189,13 @@ export default function MindSheet({
   const moveLevel = (i: number, d: number) => { const n = [...levels]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; setLevels(n); };
   const removeLevel = (i: number) => setLevels(levels.filter((_, j) => j !== i));
   const addLevel = () => { const used = new Set(levels.map((l) => l.key)); const free = sortableCols.find((c) => !used.has(c.key)); if (free) setLevels([...levels, { key: free.key, dir: 'asc' }]); };
+  // group-by list (separate from sort), when the host wires onGroupBySet
+  const gKeys = groupBy ?? [];
+  const setGroups = (ks: string[]) => onGroupBySet?.(ks.slice(0, 3));
+  const patchGroup = (i: number, key: string) => setGroups(gKeys.map((k, j) => (j === i ? key : k)));
+  const moveGroup = (i: number, d: number) => { const n = [...gKeys]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; setGroups(n); };
+  const removeGroup = (i: number) => setGroups(gKeys.filter((_, j) => j !== i));
+  const addGroup = () => { const used = new Set(gKeys); const free = sortableCols.find((c) => !used.has(c.key)); if (free) setGroups([...gKeys, free.key]); };
 
   const sortEl = onSortsSet && (
     <div className={styles.viewMenu}>
@@ -1163,7 +1206,27 @@ export default function MindSheet({
         <>
           <div className={styles.viewBackdrop} onClick={() => setSortOpen(false)} aria-hidden="true" />
           <div className={styles.viewPanel} role="dialog" aria-label={S.sortPanel} onKeyDown={(e) => { if (e.key === 'Escape') setSortOpen(false); }}>
-            <div className={styles.viewHead}>{autoGroup ? S.sortGroupHead : S.sortPanel}</div>
+            {onGroupBySet && (
+              <>
+                <div className={styles.viewHead}>{S.groupHead}</div>
+                {gKeys.length === 0 && <div className={styles.viewNote}>{S.groupEmpty}</div>}
+                {gKeys.map((k, i) => (
+                  <div key={i} className={styles.sortRow}>
+                    <span className={styles.sortIdx}>{i + 1}</span>
+                    <select className={styles.sortSel} value={k} onChange={(e) => patchGroup(i, e.target.value)}>
+                      {sortableCols.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                    </select>
+                    <button type="button" className={styles.sortIco} disabled={i === 0} title={S.sortUp} onClick={() => moveGroup(i, -1)}>↑</button>
+                    <button type="button" className={styles.sortIco} disabled={i === gKeys.length - 1} title={S.sortDown} onClick={() => moveGroup(i, 1)}>↓</button>
+                    <button type="button" className={styles.sortIco} title={S.sortRemove} onClick={() => removeGroup(i)}>×</button>
+                  </div>
+                ))}
+                {gKeys.length < 3 && gKeys.length < sortableCols.length && (
+                  <button type="button" className={styles.viewChip} onClick={addGroup}>+ {S.groupAddLevel}</button>
+                )}
+              </>
+            )}
+            <div className={styles.viewHead}>{onGroupBySet ? S.sortByHead : S.sortPanel}</div>
             {levels.length === 0 && <div className={styles.viewNote}>{S.sortEmpty}</div>}
             {levels.map((lv, i) => (
               <div key={i} className={styles.sortRow}>
@@ -1182,7 +1245,9 @@ export default function MindSheet({
             {levels.length < 3 && levels.length < sortableCols.length && (
               <button type="button" className={styles.viewChip} onClick={addLevel}>+ {S.sortAddLevel}</button>
             )}
-            {levels.length > 0 && <button type="button" className={styles.viewLink} onClick={() => setLevels([])}>{S.sortReset}</button>}
+            {(levels.length > 0 || gKeys.length > 0) && (
+              <button type="button" className={styles.viewLink} onClick={() => { setLevels([]); onGroupBySet?.([]); }}>{S.sortReset}</button>
+            )}
           </div>
         </>
       )}

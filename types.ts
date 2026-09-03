@@ -105,9 +105,15 @@ export interface MindSheetProps {
   onSortsChange?: (key: string, additive: boolean) => void;
   /** clears sorting (and therefore grouping); shows a reset button */
   onSortReset?: () => void;
-  /** replace the whole ordered list of sort/group levels at once — powers the
+  /** replace the whole ordered list of sort levels at once — powers the
      explicit «Sort & Group» panel (add / remove / reorder / asc-desc). */
   onSortsSet?: (levels: SortState[]) => void;
+  /** columns to GROUP by, independent of the sort order (Google-Sheets style).
+     When provided (even empty), it drives grouping instead of the sort levels;
+     when omitted, grouping falls back to the sort levels + autoGroup. */
+  groupBy?: string[];
+  /** replace the whole ordered list of group-by columns at once. */
+  onGroupBySet?: (keys: string[]) => void;
 
   /** ids of favourited records — shown with a filled star */
   favorites?: string[];
@@ -218,6 +224,10 @@ export interface MindSheetStrings {
   sortRemove: string;
   sortAddLevel: string;
   sortReset: string;
+  groupHead: string;
+  groupEmpty: string;
+  groupAddLevel: string;
+  sortByHead: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;
