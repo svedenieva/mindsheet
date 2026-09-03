@@ -2144,8 +2144,8 @@ export default function MindSheet({
               // starting an edit (or clicking a tag/select option while editing)
               // also opens the record page and throws the editor away
               ref={editingThis ? editingCellRef : undefined}
-              onPointerDown={selectable ? (e) => { if (e.button === 0) cellDown(index, i, e.shiftKey); } : undefined}
-              onPointerEnter={selectable ? () => cellEnter(index, i) : undefined}
+              onPointerDown={selectable && !editingThis ? (e) => { if (e.button === 0) cellDown(index, i, e.shiftKey); } : undefined}
+              onPointerEnter={selectable && !editingThis ? () => cellEnter(index, i) : undefined}
               onClick={(e) => {
                 // проглатываем клик, оставшийся от drag/Shift-выделения, чтобы он
                 // не запустил правку и не открыл карточку строки
