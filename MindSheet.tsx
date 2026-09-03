@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
 import type { AggKind, ColumnDef, ColumnType, MindSheetProps, MindSheetStrings, NumberFormat, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
 import styles from './MindSheet.module.css';
 
@@ -46,6 +46,7 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   numFormatHead: 'Формат числа',
   numFmtPlain: 'Обычное', numFmtThousands: 'Разряды 1 234', numFmtCurrency: 'Валюта', numFmtPercent: 'Проценты',
   numDecimalsHead: 'Знаков после запятой',
+  heatmapLabel: 'Тепловая карта',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -658,6 +659,11 @@ export default function MindSheet({
       const cur = d.hidden ?? [];
       return { ...d, hidden: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key] };
     });
+  const toggleHeatmap = (key: string) =>
+    setDisplay((d) => {
+      const cur = d.heatmap ?? [];
+      return { ...d, heatmap: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key] };
+    });
   const rowsClickable = Boolean(onRowOpen);
 
   // Ручной порядок строк доступен только в «естественном» порядке: без
@@ -753,6 +759,27 @@ export default function MindSheet({
   // rows in display order: a manual drag order wins; otherwise sort by the sort
   // levels (independent of grouping — Google-Sheets style)
   const displayRecords = localOrder && canReorderRows ? orderedRecords : sortRows(records, levels, columns);
+
+  // Тепловая карта: min/max по каждой числовой колонке с включённым color scale.
+  // Считаем один раз на рендер, потом красим фон ячеек интерполяцией min→max.
+  const heatStats = useMemo(() => {
+    const on = (display.heatmap ?? []).filter((k) => columns.some((c) => c.key === k && c.type === 'number'));
+    const stats: Record<string, { min: number; max: number }> = {};
+    for (const k of on) {
+      let min = Infinity;
+      let max = -Infinity;
+      for (const r of displayRecords) {
+        const v = r[k];
+        if (v === null || v === '') continue;
+        const n = Number(v);
+        if (!isFinite(n)) continue;
+        if (n < min) min = n;
+        if (n > max) max = n;
+      }
+      if (isFinite(min)) stats[k] = { min, max };
+    }
+    return stats;
+  }, [display.heatmap, columns, displayRecords]);
 
   // GROUP levels are separate from SORT: use explicit groupBy when the host gives
   // it (even empty), else fall back to the sort levels while autoGroup is on
@@ -1575,6 +1602,13 @@ export default function MindSheet({
                                 </button>
                               ))}
                             </div>
+                            <button
+                              type="button"
+                              className={cx(styles.colMenuItem, (display.heatmap ?? []).includes(c.key) && styles.colMenuItemOn)}
+                              onClick={() => { toggleHeatmap(c.key); setColMenu(null); }}
+                            >
+                              {S.heatmapLabel}{(display.heatmap ?? []).includes(c.key) ? ' ✓' : ''}
+                            </button>
                           </>
                         );
                       })()}
@@ -1979,6 +2013,7 @@ export default function MindSheet({
                 isCentered(c) && styles.center,
                 editable && styles.editableTd,
               )}
+              style={editingThis ? undefined : { background: heatBg(heatStats, c.key, r[c.key]) }}
               // stop the click bubbling to the row's onRowOpen — otherwise
               // starting an edit (or clicking a tag/select option while editing)
               // also opens the record page and throws the editor away
@@ -2132,6 +2167,18 @@ function formatNumber(value: Row[string], fmt: NumberFormat): string {
   if (fmt.style === 'currency') return `${fmt.currency || '$'}${body}`;
   if (fmt.style === 'percent') return `${body}%`;
   return body;
+}
+
+// Фон ячейки для тепловой карты: бледный при минимуме, насыщенный при максимуме.
+// Один тон (sage базы), меняется только его доля — читается как интенсивность.
+function heatBg(stats: Record<string, { min: number; max: number }>, key: string, value: Row[string]): string | undefined {
+  const s = stats[key];
+  if (!s || value === null || value === '') return undefined;
+  const n = Number(value);
+  if (!isFinite(n)) return undefined;
+  const t = s.max > s.min ? (n - s.min) / (s.max - s.min) : 0.5;
+  const pct = Math.round(8 + t * 62); // 8%..70%
+  return `color-mix(in srgb, var(--sage, #6b8f71) ${pct}%, transparent)`;
 }
 
 function renderCell(value: Row[string], col: ColumnDef, query?: string, badge?: BadgeCtx, s: MindSheetStrings = DEFAULT_STRINGS, colorByValue = false) {

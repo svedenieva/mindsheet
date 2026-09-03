@@ -71,6 +71,9 @@ export interface ViewDisplay {
   cellColors?: boolean;
   /** ключи скрытых колонок — не показываются в сетке (управляется вручную). */
   hidden?: string[];
+  /** ключи числовых колонок с тепловой картой — фон ячейки от бледного к
+      насыщенному по величине значения (color scale из Google Таблиц). */
+  heatmap?: string[];
 }
 
 export interface FilterState {
@@ -253,6 +256,7 @@ export interface MindSheetStrings {
   numFmtCurrency: string;
   numFmtPercent: string;
   numDecimalsHead: string;
+  heatmapLabel: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;
