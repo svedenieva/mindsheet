@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactElement } from 'react';
-import type { AggKind, ColumnDef, ColumnType, MindSheetProps, MindSheetStrings, NumberFormat, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
+import type { AggKind, CellFormat, ColumnDef, ColumnType, MindSheetProps, MindSheetStrings, NumberFormat, Row, RowLines, SortState, ViewDisplay, WrapStrategy } from './types';
 import styles from './MindSheet.module.css';
 
 // Надписи по умолчанию — русские. Хост может переопределить любую через проп
@@ -254,7 +254,7 @@ export default function MindSheet({
   editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset, onSortsSet, groupBy, onGroupBySet,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
-  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnFormat, onColumnsReorder, cellSelection,
+  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnFormat, onColumnsReorder, cellSelection, cellFormats, onCellFormat,
   defaultDisplay, forceDisplay, viewKey, strings, accent, toolbarLead,
 }: MindSheetProps) {
   // надписи: переданные хостом поверх русских значений по умолчанию
@@ -713,17 +713,24 @@ export default function MindSheet({
     !!selRect && row >= selRect.r0 && row <= selRect.r1 && col >= selRect.c0 && col <= selRect.c1;
 
   // ── контекстное меню по правому клику (сортировка, жирный, размер шрифта) ──
-  const [ctxMenu, setCtxMenu] = useState<null | { x: number; y: number; cols: string[]; col: string; row: Row | null }>(null);
+  const [ctxMenu, setCtxMenu] = useState<null | { x: number; y: number; cols: string[]; col: string; row: Row | null; rowIds: string[] }>(null);
   const openCtx = (row: number, col: number, x: number, y: number, rowData: Row | null) => {
     // если клик вне текущего выделения — выделяем эту одну ячейку
     let cols: string[];
+    let rowIds: string[];
     if (inSel(row, col) && selRect) {
       cols = gridCols.slice(selRect.c0, selRect.c1 + 1).map((c) => c.key);
+      rowIds = [];
+      for (let ri = selRect.r0; ri <= selRect.r1; ri++) {
+        const it = itemsRef.current[ri];
+        if (it && it.kind === 'row') rowIds.push(String(it.row.id));
+      }
     } else {
       setSel({ a: [row, col], b: [row, col] });
       cols = [gridCols[col]?.key].filter(Boolean) as string[];
+      rowIds = rowData ? [String(rowData.id)] : [];
     }
-    setCtxMenu({ x, y, cols, col: gridCols[col]?.key ?? '', row: rowData });
+    setCtxMenu({ x, y, cols, col: gridCols[col]?.key ?? '', row: rowData, rowIds });
   };
   useEffect(() => {
     if (!ctxMenu) return;
@@ -996,6 +1003,9 @@ export default function MindSheet({
   } else {
     for (const r of displayRecords) items.push({ kind: 'row', row: r, path: '' });
   }
+
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   // выделение ячеек — опт-ин (cellSelection) и только в плоском виде
   const selectable = Boolean(cellSelection) && !grouped;
@@ -1980,19 +1990,28 @@ export default function MindSheet({
             {S.menuSortDesc}
           </button>
           <div className={styles.ctxSep} />
-          <button
-            type="button"
-            className={cx(styles.ctxItem, ctxMenu.cols.every((k) => (display.bold ?? []).includes(k)) && styles.ctxItemOn)}
-            onClick={() => { applyBold(ctxMenu.cols); setCtxMenu(null); }}
-          >
-            {S.menuBold}{ctxMenu.cols.every((k) => (display.bold ?? []).includes(k)) ? ' ✓' : ''}
-          </button>
-          <div className={styles.ctxHead}>{S.menuFontHead}</div>
-          <div className={styles.ctxFont}>
-            <button type="button" className={styles.ctxFontBtn} onClick={() => { applyFontScale(ctxMenu.cols, 0.85); setCtxMenu(null); }}>{S.menuFontSmall}</button>
-            <button type="button" className={styles.ctxFontBtn} onClick={() => { applyFontScale(ctxMenu.cols, 1); setCtxMenu(null); }}>{S.menuFontNormal}</button>
-            <button type="button" className={styles.ctxFontBtn} onClick={() => { applyFontScale(ctxMenu.cols, 1.15); setCtxMenu(null); }}>{S.menuFontLarge}</button>
-          </div>
+          {(() => {
+            // жирный/размер: поклеточно (onCellFormat) для выделения, иначе — по колонке
+            const perCell = Boolean(onCellFormat);
+            const allBold = perCell
+              ? ctxMenu.rowIds.length > 0 && ctxMenu.rowIds.every((id) => ctxMenu.cols.every((k) => cellFormats?.[id]?.[k]?.bold))
+              : ctxMenu.cols.every((k) => (display.bold ?? []).includes(k));
+            const setBold = () => { if (perCell) onCellFormat!(ctxMenu.rowIds, ctxMenu.cols, { bold: !allBold }); else applyBold(ctxMenu.cols); setCtxMenu(null); };
+            const setFont = (mult: number) => { if (perCell) onCellFormat!(ctxMenu.rowIds, ctxMenu.cols, { fontScale: mult }); else applyFontScale(ctxMenu.cols, mult); setCtxMenu(null); };
+            return (
+              <>
+                <button type="button" className={cx(styles.ctxItem, allBold && styles.ctxItemOn)} onClick={setBold}>
+                  {S.menuBold}{allBold ? ' ✓' : ''}
+                </button>
+                <div className={styles.ctxHead}>{S.menuFontHead}</div>
+                <div className={styles.ctxFont}>
+                  <button type="button" className={styles.ctxFontBtn} onClick={() => setFont(0.85)}>{S.menuFontSmall}</button>
+                  <button type="button" className={styles.ctxFontBtn} onClick={() => setFont(1)}>{S.menuFontNormal}</button>
+                  <button type="button" className={styles.ctxFontBtn} onClick={() => setFont(1.15)}>{S.menuFontLarge}</button>
+                </div>
+              </>
+            );
+          })()}
           <div className={styles.ctxSep} />
           <button type="button" className={styles.ctxItem} disabled={gridCols.length <= 1} onClick={() => { toggleHidden(ctxMenu.col); setCtxMenu(null); }}>
             {S.hideColumn}
@@ -2221,9 +2240,13 @@ export default function MindSheet({
           const editingThis = editable && editing?.id === r.id && editing?.key === c.key;
           const selected = selectable && !editingThis && inSel(index, i);
           const cellStyle: CSSProperties = editingThis ? {} : { background: heatBg(heatStats, c.key, r[c.key]) };
+          // формат: сначала уровень колонки (запасной), затем поклеточный (главный)
           if ((display.bold ?? []).includes(c.key)) cellStyle.fontWeight = 700;
-          const fs = display.fontScale?.[c.key];
-          if (fs) cellStyle.fontSize = `${fs}em`;
+          const colFs = display.fontScale?.[c.key];
+          if (colFs) cellStyle.fontSize = `${colFs}em`;
+          const cf = cellFormats?.[String(r.id)]?.[c.key];
+          if (cf?.bold) cellStyle.fontWeight = 700;
+          if (cf?.fontScale) cellStyle.fontSize = `${cf.fontScale}em`;
           if (selected && selRect) {
             // синий диапазон с рамкой по краям прямоугольника — как в Google Таблицах
             const edges: string[] = [];

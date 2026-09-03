@@ -37,6 +37,13 @@ export interface Row {
   [field: string]: Cell;
 }
 
+/** Формат одной клетки. bold — жирный; fontScale — множитель размера шрифта
+    (undefined/1 = обычный). Хранится в данных строки, не в настройках вида. */
+export interface CellFormat {
+  bold?: boolean;
+  fontScale?: number;
+}
+
 export interface SortState {
   key: string;
   dir: 'asc' | 'desc';
@@ -175,6 +182,13 @@ export interface MindSheetProps {
       двойной клик — правка (или открытие страницы, если не editable). Опт-ин:
       хост Fathom его не включает и работает как раньше (клик = открыть строку). */
   cellSelection?: boolean;
+  /** Поклеточное форматирование (жирный/размер шрифта), пришедшее из данных:
+      rowId → ключ колонки → формат. Так формат живёт на конкретных клетках,
+      а не на всей колонке (как в Google Таблицах). */
+  cellFormats?: Record<string, Record<string, CellFormat>>;
+  /** применить формат к выделенным клеткам (прямоугольник rowIds × colKeys).
+      Когда задан — контекстное меню форматирует клетки, а не колонку. */
+  onCellFormat?: (rowIds: string[], colKeys: string[], patch: CellFormat) => void;
   /** новый порядок колонок (полный список ключей грид-колонок) */
   onColumnsReorder?: (keys: string[]) => void;
 
