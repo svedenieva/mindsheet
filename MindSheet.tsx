@@ -56,6 +56,8 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   menuFontSmall: 'Мельче',
   menuFontNormal: 'Обычный',
   menuFontLarge: 'Крупнее',
+  menuFill: 'Заполнить значением…',
+  menuClear: 'Очистить',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -90,6 +92,7 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   groupingHint: 'Shift + клик по заголовку — добавить уровень',
   groupColorsLabel: 'Цветные группы',
   freezeFirstLabel: 'Закрепить первую колонку',
+  freezeColsLabel: 'Закрепить колонок',
   cellColorsLabel: 'Цветные ячейки',
   clearFilter: 'Убрать фильтр',
   filterByValue: (value) => `Фильтр: ${value}`,
@@ -254,7 +257,7 @@ export default function MindSheet({
   editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset, onSortsSet, groupBy, onGroupBySet,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
-  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnFormat, onColumnsReorder, cellSelection, cellFormats, onCellFormat,
+  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnFormat, onColumnsReorder, cellSelection, cellFormats, onCellFormat, onBulkEdit,
   defaultDisplay, forceDisplay, viewKey, strings, accent, toolbarLead,
 }: MindSheetProps) {
   // надписи: переданные хостом поверх русских значений по умолчанию
@@ -815,11 +818,24 @@ export default function MindSheet({
     leadAcc += w + GAP;
     (freezeVars as Record<string, string>)[`--fz${i + 2}`] = `${leadAcc}px`;
   });
-  // Opt-in: pin the lead cells + the name column so it stays put when the table
-  // scrolls sideways. The freeze machinery (offsets + fade shadow) is all in the
-  // CSS; freeze{N} pins the first N children, so N = lead cells + 1 (the name).
-  const freezeCount = leadWidths.length + 1;
-  const freezeClass = display.freezeFirst && freezeCount <= 5 ? styles[`freeze${freezeCount}`] : undefined;
+  // Opt-in: pin the lead cells + первые N колонок данных, чтобы они не уезжали
+  // при горизонтальной прокрутке (ТР-МШ-06). freeze{N} закрепляет первые N
+  // детей строки, поэтому N = лид-ячейки + число закреплённых колонок. Смещения
+  // (--fz) для колонок данных считаем по их ширинам (widths), а без явной ширины
+  // берём значение по умолчанию — так до 5 колонок совмещаются корректно.
+  const DATA_COL_DEFAULT = 180;
+  const freezeCols = Math.max(0, Math.min(display.freezeCols ?? (display.freezeFirst ? 1 : 0), 5));
+  // смещение каждой закреплённой колонки данных = сумма лид-ячеек + ширины
+  // предыдущих закреплённых колонок; первую (--fz{lead+1}) уже задал цикл выше
+  let dataAcc = leadAcc;
+  for (let j = 1; j < freezeCols; j++) {
+    const prevKey = gridCols[j - 1]?.key;
+    const prevW = prevKey && display.widths[prevKey] ? display.widths[prevKey] : DATA_COL_DEFAULT;
+    dataAcc += prevW + GAP;
+    (freezeVars as Record<string, string>)[`--fz${leadWidths.length + 1 + j}`] = `${dataAcc}px`;
+  }
+  const freezeCount = leadWidths.length + freezeCols;
+  const freezeClass = freezeCols >= 1 && freezeCount <= 9 ? styles[`freeze${freezeCount}`] : undefined;
   const grid = [
     ...(canReorderRows ? [`${HANDLE_W}px`] : []),
     lead,
@@ -1500,13 +1516,16 @@ export default function MindSheet({
               </label>
             ))}
 
-            <label className={styles.viewToggle}>
-              <input
-                type="checkbox"
-                checked={!!display.freezeFirst}
-                onChange={(e) => setDisplay((d) => ({ ...d, freezeFirst: e.target.checked }))}
-              />
-              {S.freezeFirstLabel}
+            <label className={styles.viewFreeze}>
+              <span>{S.freezeColsLabel ?? S.freezeFirstLabel}</span>
+              <select
+                value={freezeCols}
+                onChange={(e) => setDisplay((d) => ({ ...d, freezeCols: Number(e.target.value), freezeFirst: undefined }))}
+              >
+                {[0, 1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
             </label>
             <label className={styles.viewToggle}>
               <input
@@ -1989,6 +2008,35 @@ export default function MindSheet({
           <button type="button" className={styles.ctxItem} onClick={() => { if (onSortsSet) onSortsSet([{ key: ctxMenu.col, dir: 'desc' }]); else onSortChange(ctxMenu.col); setCtxMenu(null); }}>
             {S.menuSortDesc}
           </button>
+          {onBulkEdit && ctxMenu.rowIds.length > 0 && (
+            <>
+              <div className={styles.ctxSep} />
+              <button
+                type="button"
+                className={styles.ctxItem}
+                onClick={() => {
+                  const v = window.prompt(S.menuFill);
+                  if (v === null) { setCtxMenu(null); return; }
+                  const edits = ctxMenu.rowIds.flatMap((id) => ctxMenu.cols.map((key) => ({ id, key, value: v })));
+                  onBulkEdit(edits);
+                  setCtxMenu(null);
+                }}
+              >
+                {S.menuFill}
+              </button>
+              <button
+                type="button"
+                className={styles.ctxItem}
+                onClick={() => {
+                  const edits = ctxMenu.rowIds.flatMap((id) => ctxMenu.cols.map((key) => ({ id, key, value: '' })));
+                  onBulkEdit(edits);
+                  setCtxMenu(null);
+                }}
+              >
+                {S.menuClear}
+              </button>
+            </>
+          )}
           <div className={styles.ctxSep} />
           {(() => {
             // жирный/размер: поклеточно (onCellFormat) для выделения, иначе — по колонке

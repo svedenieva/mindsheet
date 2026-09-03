@@ -1066,6 +1066,24 @@
   cursor: pointer;
 }
 
+.viewFreeze {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-70);
+}
+.viewFreeze select {
+  padding: 2px 6px;
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
 .viewLink {
   align-self: flex-start;
   margin-top: 2px;
@@ -1315,40 +1333,54 @@
 .freeze2 > *:nth-child(-n + 2),
 .freeze3 > *:nth-child(-n + 3),
 .freeze4 > *:nth-child(-n + 4),
-.freeze5 > *:nth-child(-n + 5) {
+.freeze5 > *:nth-child(-n + 5),
+.freeze6 > *:nth-child(-n + 6),
+.freeze7 > *:nth-child(-n + 7),
+.freeze8 > *:nth-child(-n + 8),
+.freeze9 > *:nth-child(-n + 9) {
   position: sticky;
   z-index: 3;
   background: var(--paper-raised);
 }
 
+.freeze1 > *:nth-child(1), .freeze2 > *:nth-child(1), .freeze3 > *:nth-child(1),
+.freeze4 > *:nth-child(1), .freeze5 > *:nth-child(1), .freeze6 > *:nth-child(1),
+.freeze7 > *:nth-child(1), .freeze8 > *:nth-child(1), .freeze9 > *:nth-child(1) { left: 0; }
+
+.freeze2 > *:nth-child(2), .freeze3 > *:nth-child(2), .freeze4 > *:nth-child(2),
+.freeze5 > *:nth-child(2), .freeze6 > *:nth-child(2), .freeze7 > *:nth-child(2),
+.freeze8 > *:nth-child(2), .freeze9 > *:nth-child(2) { left: var(--fz2, 0px); }
+
+.freeze3 > *:nth-child(3), .freeze4 > *:nth-child(3), .freeze5 > *:nth-child(3),
+.freeze6 > *:nth-child(3), .freeze7 > *:nth-child(3), .freeze8 > *:nth-child(3),
+.freeze9 > *:nth-child(3) { left: var(--fz3, 0px); }
+
+.freeze4 > *:nth-child(4), .freeze5 > *:nth-child(4), .freeze6 > *:nth-child(4),
+.freeze7 > *:nth-child(4), .freeze8 > *:nth-child(4), .freeze9 > *:nth-child(4) { left: var(--fz4, 0px); }
+
+.freeze5 > *:nth-child(5), .freeze6 > *:nth-child(5), .freeze7 > *:nth-child(5),
+.freeze8 > *:nth-child(5), .freeze9 > *:nth-child(5) { left: var(--fz5, 0px); }
+
+.freeze6 > *:nth-child(6), .freeze7 > *:nth-child(6),
+.freeze8 > *:nth-child(6), .freeze9 > *:nth-child(6) { left: var(--fz6, 0px); }
+
+.freeze7 > *:nth-child(7), .freeze8 > *:nth-child(7), .freeze9 > *:nth-child(7) { left: var(--fz7, 0px); }
+
+.freeze8 > *:nth-child(8), .freeze9 > *:nth-child(8) { left: var(--fz8, 0px); }
+
+.freeze9 > *:nth-child(9) { left: var(--fz9, 0px); }
+
+/* Правый край примороженной части — мягкая тень, чтобы прижатые колонки
+   «висели» над уезжающими вправо. Целимся в самую правую липкую ячейку. */
 .freeze1 > *:nth-child(1),
-.freeze2 > *:nth-child(1),
-.freeze3 > *:nth-child(1),
-.freeze4 > *:nth-child(1),
-.freeze5 > *:nth-child(1) { left: 0; }
-
-.freeze2 > *:nth-child(2),
-.freeze3 > *:nth-child(2),
-.freeze4 > *:nth-child(2),
-.freeze5 > *:nth-child(2) { left: var(--fz2, 0px); }
-
-.freeze3 > *:nth-child(3),
-.freeze4 > *:nth-child(3),
-.freeze5 > *:nth-child(3) { left: var(--fz3, 0px); }
-
-.freeze4 > *:nth-child(4),
-.freeze5 > *:nth-child(4) { left: var(--fz4, 0px); }
-
-.freeze5 > *:nth-child(5) { left: var(--fz5, 0px); }
-
-/* Правый край примороженной части (это как раз колонка с названием) — мягкая
-   тень, чтобы прижатая колонка «висела» над уезжающими вправо, а не сливалась.
-   Целимся в самую правую из липких ячеек каждого варианта. */
-.freeze1 > *:nth-child(1),
 .freeze2 > *:nth-child(2),
 .freeze3 > *:nth-child(3),
 .freeze4 > *:nth-child(4),
-.freeze5 > *:nth-child(5) {
+.freeze5 > *:nth-child(5),
+.freeze6 > *:nth-child(6),
+.freeze7 > *:nth-child(7),
+.freeze8 > *:nth-child(8),
+.freeze9 > *:nth-child(9) {
   box-shadow: 10px 0 12px -10px light-dark(rgba(20, 20, 20, 0.45), rgba(0, 0, 0, 0.7));
 }
 
@@ -1357,7 +1389,11 @@
 .tableHead.freeze2 > *:nth-child(-n + 2),
 .tableHead.freeze3 > *:nth-child(-n + 3),
 .tableHead.freeze4 > *:nth-child(-n + 4),
-.tableHead.freeze5 > *:nth-child(-n + 5) {
+.tableHead.freeze5 > *:nth-child(-n + 5),
+.tableHead.freeze6 > *:nth-child(-n + 6),
+.tableHead.freeze7 > *:nth-child(-n + 7),
+.tableHead.freeze8 > *:nth-child(-n + 8),
+.tableHead.freeze9 > *:nth-child(-n + 9) {
   z-index: 6;
   background: light-dark(#fbfaf8, #171c20);
 }
@@ -1366,7 +1402,11 @@
 .row:hover.freeze2 > *:nth-child(-n + 2),
 .row:hover.freeze3 > *:nth-child(-n + 3),
 .row:hover.freeze4 > *:nth-child(-n + 4),
-.row:hover.freeze5 > *:nth-child(-n + 5) {
+.row:hover.freeze5 > *:nth-child(-n + 5),
+.row:hover.freeze6 > *:nth-child(-n + 6),
+.row:hover.freeze7 > *:nth-child(-n + 7),
+.row:hover.freeze8 > *:nth-child(-n + 8),
+.row:hover.freeze9 > *:nth-child(-n + 9) {
   background: light-dark(#fbfaf8, #181d21);
 }
 

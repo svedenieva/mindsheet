@@ -72,8 +72,13 @@ export interface ViewDisplay {
   aggregates: Record<string, AggKind>;
   /** при группировке — тонировать каждую группу своим цветом. Выкл по умолчанию. */
   groupColors?: boolean;
-  /** закрепить первую колонку (с названием) при прокрутке вбок. Выкл по умолчанию. */
+  /** закрепить первую колонку (с названием) при прокрутке вбок. Выкл по умолчанию.
+      Устаревшее — используйте freezeCols; freezeFirst:true эквивалентен 1. */
   freezeFirst?: boolean;
+  /** сколько левых колонок закрепить при горизонтальной прокрутке (0–5, ТР-МШ-06).
+      Имеет приоритет над freezeFirst. Точное совмещение опирается на заданные
+      ширины (см. widths) — колонки без явной ширины берут значение по умолчанию. */
+  freezeCols?: number;
   /** тонировать ячейки select-колонок по значению. Выкл по умолчанию. */
   cellColors?: boolean;
   /** ключи скрытых колонок — не показываются в сетке (управляется вручную). */
@@ -189,6 +194,10 @@ export interface MindSheetProps {
   /** применить формат к выделенным клеткам (прямоугольник rowIds × colKeys).
       Когда задан — контекстное меню форматирует клетки, а не колонку. */
   onCellFormat?: (rowIds: string[], colKeys: string[], patch: CellFormat) => void;
+  /** массово задать значение выделенным клеткам одной операцией (ТР-МШ-14).
+      Хост применяет и предлагает отмену. Когда задан — в контекстном меню
+      появляются «Заполнить значением…» и «Очистить». */
+  onBulkEdit?: (edits: Array<{ id: string; key: string; value: string }>) => void;
   /** новый порядок колонок (полный список ключей грид-колонок) */
   onColumnsReorder?: (keys: string[]) => void;
 
@@ -293,6 +302,8 @@ export interface MindSheetStrings {
   menuFontSmall: string;
   menuFontNormal: string;
   menuFontLarge: string;
+  menuFill: string;
+  menuClear: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;
@@ -329,6 +340,7 @@ export interface MindSheetStrings {
       DEFAULT_STRINGS still supplies it, and the host may localise it. */
   groupColorsLabel?: string;
   freezeFirstLabel?: string;
+  freezeColsLabel?: string;
   cellColorsLabel?: string;
   clearFilter: string;
   filterByValue: (value: string) => string;
