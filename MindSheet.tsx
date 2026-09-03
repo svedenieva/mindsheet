@@ -37,6 +37,10 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   autoWidthLink: 'Вернуть авто-ширину колонок',
   widthNote: 'Ширина колонки — тяни за границу заголовка.',
   sortHeaderTitle: 'Клик — сортировать; Shift + клик — добавить уровень группировки',
+  sortPanel: 'Сортировка', sortPanelTitle: 'Сортировка и группировка (несколько уровней)',
+  sortGroupHead: 'Группировка и сортировка', sortEmpty: 'Уровней нет — обычный порядок',
+  sortAsc: '↑ А–Я', sortDesc: '↓ Я–А', sortUp: 'Выше', sortDown: 'Ниже', sortRemove: 'Убрать',
+  sortAddLevel: 'Добавить уровень', sortReset: 'Сбросить',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -202,7 +206,7 @@ export default function MindSheet({
   columns, records, total, loading, filtersPosition = 'top',
   sort, filter, filters, filterOptions, search,
   onSortChange, onFilterChange, onFiltersChange, onSearchChange, onRowOpen,
-  editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset,
+  editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset, onSortsSet,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
   editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnsReorder,
@@ -266,6 +270,7 @@ export default function MindSheet({
     wrap: 'wrap', lines: editable ? 1 : 3, widths: {}, aggregates: {}, ...defaultDisplay, ...forceDisplay,
   }));
   const [viewOpen, setViewOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
   // фильтры слева свёрнуты в выпадашку — панель не занимает всю колонку
   const [filtersOpen, setFiltersOpen] = useState(false);
   // раздел итогов внутри панели «Вид» — свёрнут, пока не понадобится
@@ -1139,6 +1144,51 @@ export default function MindSheet({
     </div>
   );
 
+  // «Сортировка/Группировка» — explicit multi-level panel (Google-Sheets style):
+  // pick columns, asc/desc per level, reorder, add/remove. Levels double as
+  // grouping levels when autoGroup is on.
+  const sortableCols = gridCols;
+  const setLevels = (next: SortState[]) => onSortsSet?.(next.slice(0, 3));
+  const patchLevel = (i: number, patch: Partial<SortState>) => setLevels(levels.map((lv, j) => (j === i ? { ...lv, ...patch } : lv)));
+  const moveLevel = (i: number, d: number) => { const n = [...levels]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; setLevels(n); };
+  const removeLevel = (i: number) => setLevels(levels.filter((_, j) => j !== i));
+  const addLevel = () => { const used = new Set(levels.map((l) => l.key)); const free = sortableCols.find((c) => !used.has(c.key)); if (free) setLevels([...levels, { key: free.key, dir: 'asc' }]); };
+
+  const sortEl = onSortsSet && (
+    <div className={styles.viewMenu}>
+      <button type="button" className={styles.viewBtn} aria-expanded={sortOpen} onClick={() => setSortOpen((o) => !o)} title={S.sortPanelTitle}>
+        ⇅ {S.sortPanel}{levels.length ? ` · ${levels.length}` : ''}
+      </button>
+      {sortOpen && (
+        <>
+          <div className={styles.viewBackdrop} onClick={() => setSortOpen(false)} aria-hidden="true" />
+          <div className={styles.viewPanel} role="dialog" aria-label={S.sortPanel} onKeyDown={(e) => { if (e.key === 'Escape') setSortOpen(false); }}>
+            <div className={styles.viewHead}>{autoGroup ? S.sortGroupHead : S.sortPanel}</div>
+            {levels.length === 0 && <div className={styles.viewNote}>{S.sortEmpty}</div>}
+            {levels.map((lv, i) => (
+              <div key={i} className={styles.sortRow}>
+                <span className={styles.sortIdx}>{i + 1}</span>
+                <select className={styles.sortSel} value={lv.key} onChange={(e) => patchLevel(i, { key: e.target.value })}>
+                  {sortableCols.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+                <button type="button" className={styles.sortChip} onClick={() => patchLevel(i, { dir: lv.dir === 'desc' ? 'asc' : 'desc' })}>
+                  {lv.dir === 'desc' ? S.sortDesc : S.sortAsc}
+                </button>
+                <button type="button" className={styles.sortIco} disabled={i === 0} title={S.sortUp} onClick={() => moveLevel(i, -1)}>↑</button>
+                <button type="button" className={styles.sortIco} disabled={i === levels.length - 1} title={S.sortDown} onClick={() => moveLevel(i, 1)}>↓</button>
+                <button type="button" className={styles.sortIco} title={S.sortRemove} onClick={() => removeLevel(i)}>×</button>
+              </div>
+            ))}
+            {levels.length < 3 && levels.length < sortableCols.length && (
+              <button type="button" className={styles.viewChip} onClick={addLevel}>+ {S.sortAddLevel}</button>
+            )}
+            {levels.length > 0 && <button type="button" className={styles.viewLink} onClick={() => setLevels([])}>{S.sortReset}</button>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   // «Вид» — перенос текста, высота строки, сброс ширин. Одна кнопка, чтобы
   // не растягивать панель: раскрывается панелькой поверх таблицы.
   const displayEl = (
@@ -1889,6 +1939,7 @@ export default function MindSheet({
             {searchEl}
             {toolbarLead}
             {filtersEl}
+            {sortEl}
             {displayEl}
             {sortResetEl}
             {resetEl}
@@ -1913,6 +1964,7 @@ export default function MindSheet({
             «favorites only» toggle lives inside the Filters menu; in inline mode
             it stays next to the filter selects. */}
         {filtersPosition === 'menu' ? filtersEl : (<>{filterEls}{favEl}</>)}
+        {sortEl}
         {displayEl}
         {sortResetEl}
         {resetEl}

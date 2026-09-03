@@ -1080,6 +1080,62 @@
 
 .viewLink:hover { text-decoration: underline; }
 
+/* «Сортировка/Группировка» panel rows */
+.sortRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 3px 0;
+}
+.sortIdx {
+  flex: none;
+  width: 15px;
+  text-align: center;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--ink-45);
+}
+.sortSel {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius, 8px);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 13px;
+}
+.sortSel:focus { outline: none; border-color: var(--sage); }
+.sortChip {
+  flex: none;
+  padding: 5px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius, 8px);
+  background: var(--wash);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sortChip:hover { border-color: var(--sage); }
+.sortIco {
+  flex: none;
+  width: 24px;
+  height: 27px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius, 8px);
+  background: none;
+  color: var(--ink-45);
+  font-size: 13px;
+  cursor: pointer;
+}
+.sortIco:hover:not(:disabled) { color: var(--ink); border-color: var(--sage); }
+.sortIco:disabled { opacity: 0.35; cursor: default; }
+
 /* выпадашка «Фильтры» слева — те же селекты, но не занимают всю колонку */
 .filtersPanel {
   position: absolute;

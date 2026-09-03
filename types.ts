@@ -105,6 +105,9 @@ export interface MindSheetProps {
   onSortsChange?: (key: string, additive: boolean) => void;
   /** clears sorting (and therefore grouping); shows a reset button */
   onSortReset?: () => void;
+  /** replace the whole ordered list of sort/group levels at once — powers the
+     explicit «Sort & Group» panel (add / remove / reorder / asc-desc). */
+  onSortsSet?: (levels: SortState[]) => void;
 
   /** ids of favourited records — shown with a filled star */
   favorites?: string[];
@@ -204,6 +207,17 @@ export interface MindSheetStrings {
   autoWidthLink: string;
   widthNote: string;
   sortHeaderTitle: string;
+  sortPanel: string;
+  sortPanelTitle: string;
+  sortGroupHead: string;
+  sortEmpty: string;
+  sortAsc: string;
+  sortDesc: string;
+  sortUp: string;
+  sortDown: string;
+  sortRemove: string;
+  sortAddLevel: string;
+  sortReset: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;
