@@ -1,6 +1,6 @@
 {
   "name": "@aivocado/mindsheet",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "private": true,
   "description": "Portable, data-agnostic mind-sheet table. Drop into any site; drive it with columns + rows.",
   "main": "index.ts",

@@ -74,6 +74,9 @@ export interface ViewDisplay {
   /** ключи числовых колонок с тепловой картой — фон ячейки от бледного к
       насыщенному по величине значения (color scale из Google Таблиц). */
   heatmap?: string[];
+  /** строка итогов внизу таблицы: сумма/среднее по каждой числовой колонке,
+      всегда на виду (как строка итогов в Google Таблицах). Выкл по умолчанию. */
+  footer?: boolean;
 }
 
 export interface FilterState {
@@ -257,6 +260,8 @@ export interface MindSheetStrings {
   numFmtPercent: string;
   numDecimalsHead: string;
   heatmapLabel: string;
+  footerLabel: string;
+  selCellsLabel: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;

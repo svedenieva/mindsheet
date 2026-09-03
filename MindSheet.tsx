@@ -47,6 +47,8 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   numFmtPlain: 'Обычное', numFmtThousands: 'Разряды 1 234', numFmtCurrency: 'Валюта', numFmtPercent: 'Проценты',
   numDecimalsHead: 'Знаков после запятой',
   heatmapLabel: 'Тепловая карта',
+  footerLabel: 'Итоги внизу',
+  selCellsLabel: 'Ячеек',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -664,6 +666,42 @@ export default function MindSheet({
       const cur = d.heatmap ?? [];
       return { ...d, heatmap: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key] };
     });
+
+  // ── выделение диапазона ячеек мышью (как в Google Таблицах) ──────────
+  // Тянем мышью или Shift-клик — прямоугольник ячеек подсвечивается, снизу
+  // всплывает счётчик/сумма/среднее. Работает в плоском виде (без группировки),
+  // а обычный клик (правка/открытие строки) остаётся нетронутым: подавляем его
+  // только когда реально был сделан drag или Shift-клик.
+  const [sel, setSel] = useState<null | { a: [number, number]; b: [number, number] }>(null);
+  const selDragging = useRef(false);
+  const selMoved = useRef(false);
+  const selSuppressClick = useRef(false);
+  const cellDown = (row: number, col: number, shift: boolean) => {
+    if (shift && sel) {
+      setSel({ a: sel.a, b: [row, col] });
+      selSuppressClick.current = true;
+      selMoved.current = true;
+      return;
+    }
+    selDragging.current = true;
+    selMoved.current = false;
+    selSuppressClick.current = false;
+    setSel({ a: [row, col], b: [row, col] });
+  };
+  const cellEnter = (row: number, col: number) => {
+    if (!selDragging.current) return;
+    selMoved.current = true;
+    selSuppressClick.current = true;
+    setSel((s) => (s ? { a: s.a, b: [row, col] } : s));
+  };
+  const inSel = (row: number, col: number) => {
+    if (!sel) return false;
+    const r0 = Math.min(sel.a[0], sel.b[0]);
+    const r1 = Math.max(sel.a[0], sel.b[0]);
+    const c0 = Math.min(sel.a[1], sel.b[1]);
+    const c1 = Math.max(sel.a[1], sel.b[1]);
+    return row >= r0 && row <= r1 && col >= c0 && col <= c1;
+  };
   const rowsClickable = Boolean(onRowOpen);
 
   // Ручной порядок строк доступен только в «естественном» порядке: без
@@ -909,6 +947,46 @@ export default function MindSheet({
   } else {
     for (const r of displayRecords) items.push({ kind: 'row', row: r, path: '' });
   }
+
+  // выделение ячеек — только в плоском виде; при группировке сбрасываем
+  const selectable = !grouped;
+  useEffect(() => { if (grouped) setSel(null); }, [grouped]);
+  useEffect(() => {
+    const up = () => {
+      if (!selDragging.current) return;
+      selDragging.current = false;
+      if (!selMoved.current) { setSel(null); selSuppressClick.current = false; }
+    };
+    window.addEventListener('pointerup', up);
+    return () => window.removeEventListener('pointerup', up);
+  }, []);
+  // счётчик/сумма/среднее по выделенному прямоугольнику (только числа считаются)
+  const selStats = useMemo(() => {
+    if (!sel || grouped) return null;
+    const r0 = Math.min(sel.a[0], sel.b[0]);
+    const r1 = Math.max(sel.a[0], sel.b[0]);
+    const c0 = Math.min(sel.a[1], sel.b[1]);
+    const c1 = Math.max(sel.a[1], sel.b[1]);
+    if (r0 === r1 && c0 === c1) return null; // одна ячейка — не показываем панель
+    let count = 0;
+    let sum = 0;
+    let nums = 0;
+    for (let ri = r0; ri <= r1; ri++) {
+      const it = items[ri];
+      if (!it || it.kind !== 'row') continue;
+      for (let ci = c0; ci <= c1; ci++) {
+        const col = gridCols[ci];
+        if (!col) continue;
+        const v = it.row[col.key];
+        if (v === null || v === undefined || v === '') continue;
+        count++;
+        const n = Number(String(v).replace(',', '.'));
+        if (isFinite(n)) { sum += n; nums++; }
+      }
+    }
+    return { count, sum, nums };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel, grouped, gridCols, records, displayRecords]);
 
   // ── окно видимых строк ──────────────────────────────────────────────
   // Раньше в DOM жили все строки разом: на каталоге это почти пять тысяч
@@ -1378,6 +1456,14 @@ export default function MindSheet({
               />
               {S.cellColorsLabel}
             </label>
+            <label className={styles.viewToggle}>
+              <input
+                type="checkbox"
+                checked={!!display.footer}
+                onChange={(e) => setDisplay((d) => ({ ...d, footer: e.target.checked }))}
+              />
+              {S.footerLabel}
+            </label>
 
             {autoGroup && (
               <>
@@ -1780,7 +1866,46 @@ export default function MindSheet({
               ))}
             </div>
           )}
+
+          {display.footer && !loading && (
+            <div className={cx(styles.row, styles.footerRow, freezeClass)} style={freezeVars} role="row">
+              {canReorderRows && <div className={styles.caretCell} />}
+              <div className={styles.caretCell} />
+              {canFavorite && <div className={styles.caretCell} />}
+              {showRowDelete && <div className={styles.caretCell} />}
+              {gridCols.map((c, i) => {
+                let content = '';
+                let title: string | undefined;
+                if (i === 0) {
+                  content = String(displayRecords.length);
+                } else if (c.type === 'number') {
+                  const kind = display.aggregates[c.key] ?? 'sum';
+                  content = aggregate(displayRecords, c.key, kind, S) ?? '';
+                  title = kind;
+                } else if (display.aggregates[c.key]) {
+                  content = aggregate(displayRecords, c.key, display.aggregates[c.key], S) ?? '';
+                }
+                return (
+                  <div key={c.key} className={cx(styles.td, styles.footerCell, isCentered(c) && styles.center)} title={title}>
+                    {content}
+                  </div>
+                );
+              })}
+            </div>
+          )}
       </div>
+
+      {selStats && (
+        <div className={styles.selBar} role="status">
+          <span>{S.selCellsLabel} <b>{selStats.count}</b></span>
+          {selStats.nums > 0 && (
+            <>
+              <span>{S.aggSum} <b>{Number.isInteger(selStats.sum) ? selStats.sum : selStats.sum.toFixed(2)}</b></span>
+              <span>{S.aggAvg} <b>{(() => { const a = selStats.sum / selStats.nums; return Number.isInteger(a) ? a : a.toFixed(2); })()}</b></span>
+            </>
+          )}
+        </div>
+      )}
 
       {editable &&
         gridCols
@@ -2012,13 +2137,21 @@ export default function MindSheet({
                 c.key === firstKey && styles.strong,
                 isCentered(c) && styles.center,
                 editable && styles.editableTd,
+                selectable && inSel(index, i) && styles.selCell,
               )}
               style={editingThis ? undefined : { background: heatBg(heatStats, c.key, r[c.key]) }}
               // stop the click bubbling to the row's onRowOpen — otherwise
               // starting an edit (or clicking a tag/select option while editing)
               // also opens the record page and throws the editor away
               ref={editingThis ? editingCellRef : undefined}
-              onClick={editable ? (e) => { e.stopPropagation(); if (!editingThis) startEdit(r, c.key); } : undefined}
+              onPointerDown={selectable ? (e) => { if (e.button === 0) cellDown(index, i, e.shiftKey); } : undefined}
+              onPointerEnter={selectable ? () => cellEnter(index, i) : undefined}
+              onClick={(e) => {
+                // проглатываем клик, оставшийся от drag/Shift-выделения, чтобы он
+                // не запустил правку и не открыл карточку строки
+                if (selSuppressClick.current) { e.stopPropagation(); selSuppressClick.current = false; return; }
+                if (editable) { e.stopPropagation(); if (!editingThis) startEdit(r, c.key); }
+              }}
               // keep editor keystrokes (Enter to commit, Space in a tag) from
               // bubbling to the row, whose Enter/Space opens the record page
               onKeyDown={editable ? (e) => e.stopPropagation() : undefined}

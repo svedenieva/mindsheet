@@ -1580,6 +1580,48 @@
 }
 .colMenuDecBtn:hover { background: var(--wash); color: var(--ink); }
 .numCell { font-variant-numeric: tabular-nums; }
+
+/* выделенная мышью ячейка диапазона */
+.selCell {
+  background: color-mix(in srgb, var(--sage, #6b8f71) 16%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sage, #6b8f71) 55%, transparent);
+  user-select: none;
+}
+
+/* строка итогов снизу — липнет к нижнему краю прокрутки */
+.footerRow {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: var(--paper, #fff);
+  border-top: 1px solid var(--rule, #e6e3dc);
+  font-variant-numeric: tabular-nums;
+}
+.footerCell {
+  font-weight: 600;
+  color: var(--ink-70);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* плавающая панель итогов по выделению (как статус-бар Google Таблиц) */
+.selBar {
+  position: fixed;
+  bottom: 18px;
+  right: 26px;
+  z-index: 20;
+  display: flex;
+  gap: 14px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--ink, #2b2b2b);
+  color: var(--paper, #fff);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+}
+.selBar b { font-weight: 700; margin-left: 2px; }
 .colMenuDanger { color: var(--ink-45); margin-top: 3px; border-top: 1px solid var(--rule-soft); border-radius: 0; }
 .colMenuDanger:hover:not(:disabled) { background: var(--danger-soft, var(--wash)); color: var(--error); }
 
