@@ -1581,12 +1581,60 @@
 .colMenuDecBtn:hover { background: var(--wash); color: var(--ink); }
 .numCell { font-variant-numeric: tabular-nums; }
 
-/* выделенная мышью ячейка диапазона */
-.selCell {
-  background: color-mix(in srgb, var(--sage, #6b8f71) 16%, transparent) !important;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sage, #6b8f71) 55%, transparent);
-  user-select: none;
+/* выделенная мышью ячейка диапазона — синий фон/рамку задаёт inline-стиль,
+   здесь только запрет выделения текста, чтобы drag не тащил выделение браузера */
+.selCell { user-select: none; }
+.table { --sel: #1a73e8; --sel-fill: rgba(26, 115, 232, 0.12); }
+:global([data-theme='dark']) .table { --sel: #8ab4f8; --sel-fill: rgba(138, 180, 248, 0.18); }
+
+/* контекстное меню по правому клику */
+.ctxMenu {
+  position: fixed;
+  z-index: 50;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  background: var(--paper, #fff);
+  border: 1px solid var(--rule, #e6e3dc);
+  border-radius: 10px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
+.ctxItem {
+  padding: 7px 9px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--ink-70);
+  text-align: left;
+  cursor: pointer;
+}
+.ctxItem:hover:not(:disabled) { background: var(--wash); color: var(--ink); }
+.ctxItem:disabled { opacity: 0.4; cursor: default; }
+.ctxItemOn { color: var(--sage); }
+.ctxHead {
+  padding: 6px 9px 2px;
+  font-family: var(--font-mono), monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-25);
+}
+.ctxFont { display: flex; gap: 4px; padding: 2px 9px 4px; }
+.ctxFontBtn {
+  flex: 1;
+  padding: 5px 0;
+  background: none;
+  border: 1px solid var(--rule-soft);
+  border-radius: 7px;
+  font-size: 11.5px;
+  color: var(--ink-70);
+  cursor: pointer;
+}
+.ctxFontBtn:hover { background: var(--wash); color: var(--ink); }
+.ctxSep { height: 1px; margin: 4px 6px; background: var(--rule-soft); }
 
 /* строка итогов снизу — липнет к нижнему краю прокрутки */
 .footerRow {

@@ -49,6 +49,13 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   heatmapLabel: 'Тепловая карта',
   footerLabel: 'Итоги внизу',
   selCellsLabel: 'Ячеек',
+  menuSortAsc: 'Сортировать ↑ А–Я',
+  menuSortDesc: 'Сортировать ↓ Я–А',
+  menuBold: 'Жирный',
+  menuFontHead: 'Размер шрифта',
+  menuFontSmall: 'Мельче',
+  menuFontNormal: 'Обычный',
+  menuFontLarge: 'Крупнее',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -694,14 +701,56 @@ export default function MindSheet({
     selSuppressClick.current = true;
     setSel((s) => (s ? { a: s.a, b: [row, col] } : s));
   };
-  const inSel = (row: number, col: number) => {
-    if (!sel) return false;
-    const r0 = Math.min(sel.a[0], sel.b[0]);
-    const r1 = Math.max(sel.a[0], sel.b[0]);
-    const c0 = Math.min(sel.a[1], sel.b[1]);
-    const c1 = Math.max(sel.a[1], sel.b[1]);
-    return row >= r0 && row <= r1 && col >= c0 && col <= c1;
+  const selRect = sel
+    ? {
+        r0: Math.min(sel.a[0], sel.b[0]),
+        r1: Math.max(sel.a[0], sel.b[0]),
+        c0: Math.min(sel.a[1], sel.b[1]),
+        c1: Math.max(sel.a[1], sel.b[1]),
+      }
+    : null;
+  const inSel = (row: number, col: number) =>
+    !!selRect && row >= selRect.r0 && row <= selRect.r1 && col >= selRect.c0 && col <= selRect.c1;
+
+  // ── контекстное меню по правому клику (сортировка, жирный, размер шрифта) ──
+  const [ctxMenu, setCtxMenu] = useState<null | { x: number; y: number; cols: string[]; col: string }>(null);
+  const openCtx = (row: number, col: number, x: number, y: number) => {
+    // если клик вне текущего выделения — выделяем эту одну ячейку
+    let cols: string[];
+    if (inSel(row, col) && selRect) {
+      cols = gridCols.slice(selRect.c0, selRect.c1 + 1).map((c) => c.key);
+    } else {
+      setSel({ a: [row, col], b: [row, col] });
+      cols = [gridCols[col]?.key].filter(Boolean) as string[];
+    }
+    setCtxMenu({ x, y, cols, col: gridCols[col]?.key ?? '' });
   };
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== 'Escape') return;
+      setCtxMenu(null);
+    };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', close);
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', close); };
+  }, [ctxMenu]);
+  const applyBold = (cols: string[]) =>
+    setDisplay((d) => {
+      const cur = new Set(d.bold ?? []);
+      const allOn = cols.every((k) => cur.has(k));
+      cols.forEach((k) => (allOn ? cur.delete(k) : cur.add(k)));
+      return { ...d, bold: [...cur] };
+    });
+  const applyFontScale = (cols: string[], mult: number) =>
+    setDisplay((d) => {
+      const next = { ...(d.fontScale ?? {}) };
+      for (const k of cols) {
+        if (mult === 1) delete next[k];
+        else next[k] = mult;
+      }
+      return { ...d, fontScale: next };
+    });
   const rowsClickable = Boolean(onRowOpen);
 
   // Ручной порядок строк доступен только в «естественном» порядке: без
@@ -1907,6 +1956,41 @@ export default function MindSheet({
         </div>
       )}
 
+      {ctxMenu && (
+        <div
+          className={styles.ctxMenu}
+          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          role="menu"
+          // не даём событию закрыть меню раньше, чем отработает пункт
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <button type="button" className={styles.ctxItem} onClick={() => { if (onSortsSet) onSortsSet([{ key: ctxMenu.col, dir: 'asc' }]); else onSortChange(ctxMenu.col); setCtxMenu(null); }}>
+            {S.menuSortAsc}
+          </button>
+          <button type="button" className={styles.ctxItem} onClick={() => { if (onSortsSet) onSortsSet([{ key: ctxMenu.col, dir: 'desc' }]); else onSortChange(ctxMenu.col); setCtxMenu(null); }}>
+            {S.menuSortDesc}
+          </button>
+          <div className={styles.ctxSep} />
+          <button
+            type="button"
+            className={cx(styles.ctxItem, ctxMenu.cols.every((k) => (display.bold ?? []).includes(k)) && styles.ctxItemOn)}
+            onClick={() => { applyBold(ctxMenu.cols); setCtxMenu(null); }}
+          >
+            {S.menuBold}{ctxMenu.cols.every((k) => (display.bold ?? []).includes(k)) ? ' ✓' : ''}
+          </button>
+          <div className={styles.ctxHead}>{S.menuFontHead}</div>
+          <div className={styles.ctxFont}>
+            <button type="button" className={styles.ctxFontBtn} onClick={() => { applyFontScale(ctxMenu.cols, 0.85); setCtxMenu(null); }}>{S.menuFontSmall}</button>
+            <button type="button" className={styles.ctxFontBtn} onClick={() => { applyFontScale(ctxMenu.cols, 1); setCtxMenu(null); }}>{S.menuFontNormal}</button>
+            <button type="button" className={styles.ctxFontBtn} onClick={() => { applyFontScale(ctxMenu.cols, 1.15); setCtxMenu(null); }}>{S.menuFontLarge}</button>
+          </div>
+          <div className={styles.ctxSep} />
+          <button type="button" className={styles.ctxItem} disabled={gridCols.length <= 1} onClick={() => { toggleHidden(ctxMenu.col); setCtxMenu(null); }}>
+            {S.hideColumn}
+          </button>
+        </div>
+      )}
+
       {editable &&
         gridCols
           .filter((c) => c.type === 'select' || c.type === 'multiselect')
@@ -2126,6 +2210,21 @@ export default function MindSheet({
         )}
         {gridCols.map((c, i) => {
           const editingThis = editable && editing?.id === r.id && editing?.key === c.key;
+          const selected = selectable && !editingThis && inSel(index, i);
+          const cellStyle: CSSProperties = editingThis ? {} : { background: heatBg(heatStats, c.key, r[c.key]) };
+          if ((display.bold ?? []).includes(c.key)) cellStyle.fontWeight = 700;
+          const fs = display.fontScale?.[c.key];
+          if (fs) cellStyle.fontSize = `${fs}em`;
+          if (selected && selRect) {
+            // синий диапазон с рамкой по краям прямоугольника — как в Google Таблицах
+            const edges: string[] = [];
+            if (index === selRect.r0) edges.push('inset 0 2px 0 0 var(--sel, #1a73e8)');
+            if (index === selRect.r1) edges.push('inset 0 -2px 0 0 var(--sel, #1a73e8)');
+            if (i === selRect.c0) edges.push('inset 2px 0 0 0 var(--sel, #1a73e8)');
+            if (i === selRect.c1) edges.push('inset -2px 0 0 0 var(--sel, #1a73e8)');
+            cellStyle.background = 'var(--sel-fill, rgba(26,115,232,0.12))';
+            if (edges.length) cellStyle.boxShadow = edges.join(', ');
+          }
           return (
             <div
               key={c.key}
@@ -2137,15 +2236,16 @@ export default function MindSheet({
                 c.key === firstKey && styles.strong,
                 isCentered(c) && styles.center,
                 editable && styles.editableTd,
-                selectable && inSel(index, i) && styles.selCell,
+                selected && styles.selCell,
               )}
-              style={editingThis ? undefined : { background: heatBg(heatStats, c.key, r[c.key]) }}
+              style={cellStyle}
               // stop the click bubbling to the row's onRowOpen — otherwise
               // starting an edit (or clicking a tag/select option while editing)
               // also opens the record page and throws the editor away
               ref={editingThis ? editingCellRef : undefined}
               onPointerDown={selectable && !editingThis ? (e) => { if (e.button === 0) cellDown(index, i, e.shiftKey); } : undefined}
               onPointerEnter={selectable && !editingThis ? () => cellEnter(index, i) : undefined}
+              onContextMenu={selectable ? (e) => { e.preventDefault(); e.stopPropagation(); openCtx(index, i, e.clientX, e.clientY); } : undefined}
               onClick={(e) => {
                 // проглатываем клик, оставшийся от drag/Shift-выделения, чтобы он
                 // не запустил правку и не открыл карточку строки

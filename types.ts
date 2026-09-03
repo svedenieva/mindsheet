@@ -77,6 +77,10 @@ export interface ViewDisplay {
   /** строка итогов внизу таблицы: сумма/среднее по каждой числовой колонке,
       всегда на виду (как строка итогов в Google Таблицах). Выкл по умолчанию. */
   footer?: boolean;
+  /** ключи колонок с жирным текстом (форматирование из контекстного меню). */
+  bold?: string[];
+  /** масштаб шрифта по колонке: ключ → множитель (0.85 / 1 / 1.15). */
+  fontScale?: Record<string, number>;
 }
 
 export interface FilterState {
@@ -262,6 +266,13 @@ export interface MindSheetStrings {
   heatmapLabel: string;
   footerLabel: string;
   selCellsLabel: string;
+  menuSortAsc: string;
+  menuSortDesc: string;
+  menuBold: string;
+  menuFontHead: string;
+  menuFontSmall: string;
+  menuFontNormal: string;
+  menuFontLarge: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;
