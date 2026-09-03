@@ -1624,6 +1624,92 @@
 /* выделенная мышью ячейка диапазона — синий фон/рамку задаёт inline-стиль,
    здесь только запрет выделения текста, чтобы drag не тащил выделение браузера */
 .selCell { user-select: none; }
+
+/* ── панель форматирования (как группа «Шрифт» в Excel/Word) ────────── */
+.fmtBar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+  background: var(--paper-raised, var(--paper, #fff));
+  border: 1px solid var(--rule, #e6e3dc);
+  border-radius: 9px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+.fmtFont, .fmtSize {
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 6px;
+  background: var(--paper, #fff);
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.fmtFont { min-width: 118px; }
+.fmtSize { width: 52px; }
+.fmtBtn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-70);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fmtBtn:hover { background: var(--wash); color: var(--ink); border-color: var(--rule-soft); }
+.fmtBtn sup, .fmtBtn sub { font-size: 8px; }
+.fmtBold { font-weight: 800; }
+.fmtItalic { font-style: italic; font-family: Georgia, serif; }
+.fmtUnder { text-decoration: underline; }
+.fmtOn { background: color-mix(in srgb, var(--sage, #6b8f71) 22%, transparent); color: var(--ink); border-color: color-mix(in srgb, var(--sage, #6b8f71) 45%, transparent); }
+.fmtDiv { width: 1px; height: 20px; margin: 0 3px; background: var(--rule, #e6e3dc); }
+.fmtBucket { font-size: 13px; }
+.fmtA { font-weight: 700; }
+.fmtBar2 { display: block; width: 15px; height: 3px; margin-top: 1px; background: #f4c20d; border-radius: 1px; }
+.fmtBtn { flex-direction: column; }
+.fmtPop { position: relative; display: inline-flex; }
+.fmtSwatches {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 7px;
+  background: var(--paper, #fff);
+  border: 1px solid var(--rule, #e6e3dc);
+  border-radius: 8px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.16);
+}
+.fmtSwatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.fmtSwatch:hover { outline: 2px solid var(--sage, #6b8f71); outline-offset: 1px; }
+.fmtNo {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-45);
+  font-size: 11px;
+  cursor: pointer;
+}
 /* в режиме выделения клик по клетке не должен выделять текст внутри неё —
    иначе на текстовых колонках (название) браузер хватает text-selection */
 .selMode .td { user-select: none; }

@@ -47,6 +47,14 @@ export interface CellFormat {
   underline?: boolean;
   fontPx?: number;
   fontScale?: number;
+  /** семейство шрифта (значение CSS font-family) */
+  fontFamily?: string;
+  /** цвет текста (CSS-цвет) */
+  color?: string;
+  /** цвет заливки клетки (CSS-цвет) */
+  fill?: string;
+  /** выравнивание текста в клетке */
+  align?: 'left' | 'center' | 'right';
 }
 
 export interface SortState {
@@ -312,6 +320,16 @@ export interface MindSheetStrings {
   menuItalic: string;
   menuUnderline: string;
   menuFontDefault: string;
+  tbFont: string;
+  tbBigger: string;
+  tbSmaller: string;
+  tbFill: string;
+  tbColor: string;
+  tbAlignLeft: string;
+  tbAlignCenter: string;
+  tbAlignRight: string;
+  tbClearFormat: string;
+  tbNoColor: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;

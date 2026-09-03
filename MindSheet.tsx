@@ -61,6 +61,16 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   menuItalic: 'Курсив',
   menuUnderline: 'Подчёркнутый',
   menuFontDefault: 'По умолчанию',
+  tbFont: 'Шрифт',
+  tbBigger: 'Крупнее',
+  tbSmaller: 'Мельче',
+  tbFill: 'Цвет заливки',
+  tbColor: 'Цвет текста',
+  tbAlignLeft: 'По левому краю',
+  tbAlignCenter: 'По центру',
+  tbAlignRight: 'По правому краю',
+  tbClearFormat: 'Очистить формат',
+  tbNoColor: 'Без цвета',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -133,6 +143,20 @@ function aggregate(rows: Row[], key: string, kind: AggKind, s: MindSheetStrings)
 }
 
 const MIN_COL_WIDTH = 64;
+
+// панель форматирования: наборы шрифтов, размеров и палитра цветов
+const FMT_FONTS: Array<{ v: string; label: string }> = [
+  { v: '', label: 'Alegreya' },
+  { v: 'Arial, sans-serif', label: 'Arial' },
+  { v: '"Helvetica Neue", Helvetica, sans-serif', label: 'Helvetica' },
+  { v: 'Georgia, serif', label: 'Georgia' },
+  { v: '"Times New Roman", serif', label: 'Times New Roman' },
+  { v: 'Calibri, "Segoe UI", sans-serif', label: 'Calibri' },
+  { v: '"Courier New", monospace', label: 'Courier New' },
+  { v: 'ui-monospace, "Cascadia Code", monospace', label: 'Monospace' },
+];
+const FMT_SIZES = [10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 40];
+const FMT_PALETTE = ['#111827', '#dc2626', '#ea580c', '#f59e0b', '#16a34a', '#0891b2', '#2563eb', '#7c3aed', '#db2777', '#6b7280', '#ffffff'];
 
 // ширина хвостового трека под кнопку «+ колонка»
 const ADD_COL_TRACK = 40;
@@ -764,6 +788,25 @@ export default function MindSheet({
       }
       return { ...d, fontScale: next };
     });
+
+  // ── панель форматирования (как группа «Шрифт» в Excel/Word) ──────────
+  const [palette, setPalette] = useState<null | 'fill' | 'color'>(null);
+  useEffect(() => {
+    if (!palette) return;
+    const close = () => setPalette(null);
+    window.addEventListener('pointerdown', close);
+    return () => window.removeEventListener('pointerdown', close);
+  }, [palette]);
+  const applyFmt = (patch: CellFormat) => {
+    if (!onCellFormat || !selRect) return;
+    const colKeys = gridCols.slice(selRect.c0, selRect.c1 + 1).map((c) => c.key);
+    const rowIds: string[] = [];
+    for (let ri = selRect.r0; ri <= selRect.r1; ri++) {
+      const it = itemsRef.current[ri];
+      if (it && it.kind === 'row') rowIds.push(String(it.row.id));
+    }
+    if (rowIds.length) onCellFormat(rowIds, colKeys, patch);
+  };
   const rowsClickable = Boolean(onRowOpen);
 
   // Ручной порядок строк доступен только в «естественном» порядке: без
@@ -1616,6 +1659,86 @@ export default function MindSheet({
     </span>
   );
 
+  // Панель форматирования выделенных клеток — вид как группа «Шрифт» в Excel/Word.
+  const formatBar = selectable && sel && onCellFormat ? (() => {
+    const cells: CellFormat[] = [];
+    if (selRect) {
+      for (let ri = selRect.r0; ri <= selRect.r1; ri++) {
+        const it = itemsRef.current[ri];
+        if (!it || it.kind !== 'row') continue;
+        for (let ci = selRect.c0; ci <= selRect.c1; ci++) {
+          const key = gridCols[ci]?.key;
+          if (key) cells.push(cellFormats?.[String(it.row.id)]?.[key] ?? {});
+        }
+      }
+    }
+    const all = (p: (f: CellFormat) => boolean) => cells.length > 0 && cells.every(p);
+    const uni = (g: (f: CellFormat) => string | number | undefined): string => {
+      const s = new Set(cells.map(g));
+      return s.size === 1 ? String([...s][0] ?? '') : '';
+    };
+    const allBold = all((f) => !!f.bold);
+    const allItalic = all((f) => !!f.italic);
+    const allUnder = all((f) => !!f.underline);
+    const curPx = uni((f) => f.fontPx);
+    const curFamily = uni((f) => f.fontFamily);
+    const curAlign = uni((f) => f.align);
+    const bump = (dir: number) => {
+      const base = Number(curPx) || 13;
+      let idx = FMT_SIZES.findIndex((s) => s >= base);
+      if (idx < 0) idx = FMT_SIZES.length - 1;
+      const ni = Math.max(0, Math.min(FMT_SIZES.length - 1, idx + dir));
+      applyFmt({ fontPx: FMT_SIZES[ni] });
+    };
+    const swatch = (kind: 'fill' | 'color', color: string) => { applyFmt(kind === 'fill' ? { fill: color } : { color }); setPalette(null); };
+    return (
+      <div className={styles.fmtBar} role="toolbar" onPointerDown={(e) => e.stopPropagation()}>
+        <select className={styles.fmtFont} value={curFamily} title={S.tbFont} onChange={(e) => applyFmt({ fontFamily: e.target.value })}>
+          {FMT_FONTS.map((f) => <option key={f.label} value={f.v}>{f.label}</option>)}
+        </select>
+        <select className={styles.fmtSize} value={curPx} title={S.menuFontHead} onChange={(e) => applyFmt({ fontPx: e.target.value ? Number(e.target.value) : 0 })}>
+          <option value="">–</option>
+          {FMT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <button type="button" className={styles.fmtBtn} title={S.tbBigger} onClick={() => bump(1)}>A<sup>▲</sup></button>
+        <button type="button" className={styles.fmtBtn} title={S.tbSmaller} onClick={() => bump(-1)}>A<sub>▼</sub></button>
+        <span className={styles.fmtDiv} />
+        <button type="button" className={cx(styles.fmtBtn, styles.fmtBold, allBold && styles.fmtOn)} title={S.menuBold} onClick={() => applyFmt({ bold: !allBold })}>B</button>
+        <button type="button" className={cx(styles.fmtBtn, styles.fmtItalic, allItalic && styles.fmtOn)} title={S.menuItalic} onClick={() => applyFmt({ italic: !allItalic })}>I</button>
+        <button type="button" className={cx(styles.fmtBtn, styles.fmtUnder, allUnder && styles.fmtOn)} title={S.menuUnderline} onClick={() => applyFmt({ underline: !allUnder })}>U</button>
+        <span className={styles.fmtDiv} />
+        <span className={styles.fmtPop}>
+          <button type="button" className={styles.fmtBtn} title={S.tbFill} onClick={() => setPalette(palette === 'fill' ? null : 'fill')}>
+            <span className={styles.fmtBucket}>▩</span><span className={styles.fmtBar2} />
+          </button>
+          {palette === 'fill' && (
+            <span className={styles.fmtSwatches}>
+              <button type="button" className={styles.fmtNo} title={S.tbNoColor} onClick={() => swatch('fill', '')}>✕</button>
+              {FMT_PALETTE.map((c) => <button key={c} type="button" className={styles.fmtSwatch} style={{ background: c }} onClick={() => swatch('fill', c)} />)}
+            </span>
+          )}
+        </span>
+        <span className={styles.fmtPop}>
+          <button type="button" className={styles.fmtBtn} title={S.tbColor} onClick={() => setPalette(palette === 'color' ? null : 'color')}>
+            <span className={styles.fmtA}>A</span><span className={styles.fmtBar2} style={{ background: '#dc2626' }} />
+          </button>
+          {palette === 'color' && (
+            <span className={styles.fmtSwatches}>
+              <button type="button" className={styles.fmtNo} title={S.tbNoColor} onClick={() => swatch('color', '')}>✕</button>
+              {FMT_PALETTE.map((c) => <button key={c} type="button" className={styles.fmtSwatch} style={{ background: c }} onClick={() => swatch('color', c)} />)}
+            </span>
+          )}
+        </span>
+        <span className={styles.fmtDiv} />
+        <button type="button" className={cx(styles.fmtBtn, curAlign === 'left' && styles.fmtOn)} title={S.tbAlignLeft} onClick={() => applyFmt({ align: 'left' })}>⯀≡</button>
+        <button type="button" className={cx(styles.fmtBtn, curAlign === 'center' && styles.fmtOn)} title={S.tbAlignCenter} onClick={() => applyFmt({ align: 'center' })}>≡</button>
+        <button type="button" className={cx(styles.fmtBtn, curAlign === 'right' && styles.fmtOn)} title={S.tbAlignRight} onClick={() => applyFmt({ align: 'right' })}>≡⯀</button>
+        <span className={styles.fmtDiv} />
+        <button type="button" className={styles.fmtBtn} title={S.tbClearFormat} onClick={() => applyFmt({ bold: false, italic: false, underline: false, fontPx: 0, fontFamily: '', color: '', fill: '', align: 'left' })}>⌫</button>
+      </div>
+    );
+  })() : null;
+
   const tableEl = (
     <div className={cx(styles.tableScroll, sizedCols && styles.sized)} ref={tableRef}>
       <div className={cx(styles.table, editable && styles.compact, selectable && styles.selMode)} style={gridStyle} role="table">
@@ -2336,6 +2459,10 @@ export default function MindSheet({
           if (cf?.underline) cellStyle.textDecoration = 'underline';
           if (cf?.fontPx) cellStyle.fontSize = `${cf.fontPx}px`;
           else if (cf?.fontScale) cellStyle.fontSize = `${cf.fontScale}em`;
+          if (cf?.fontFamily) cellStyle.fontFamily = cf.fontFamily;
+          if (cf?.color) cellStyle.color = cf.color;
+          if (cf?.fill) cellStyle.background = cf.fill;
+          if (cf?.align) cellStyle.textAlign = cf.align;
           if (selected && selRect) {
             // синий диапазон с рамкой по краям прямоугольника — как в Google Таблицах
             const edges: string[] = [];
@@ -2508,6 +2635,7 @@ export default function MindSheet({
         {resetEl}
         {countEl}
       </div>
+      {formatBar}
       <div className={styles.withCard}>
         {tableEl}
         {cardEl}
