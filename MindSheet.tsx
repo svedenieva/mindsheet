@@ -58,6 +58,9 @@ export const DEFAULT_STRINGS: MindSheetStrings = {
   menuFontLarge: 'Крупнее',
   menuFill: 'Заполнить значением…',
   menuClear: 'Очистить',
+  menuItalic: 'Курсив',
+  menuUnderline: 'Подчёркнутый',
+  menuFontDefault: 'По умолчанию',
   colMenuAria: (label) => `Колонка ${label}`,
   rename: 'Переименовать',
   typeHead: 'Тип',
@@ -2039,24 +2042,59 @@ export default function MindSheet({
           )}
           <div className={styles.ctxSep} />
           {(() => {
-            // жирный/размер: поклеточно (onCellFormat) для выделения, иначе — по колонке
+            // начертание/размер: поклеточно (onCellFormat) для выделения, иначе — по колонке
             const perCell = Boolean(onCellFormat);
-            const allBold = perCell
-              ? ctxMenu.rowIds.length > 0 && ctxMenu.rowIds.every((id) => ctxMenu.cols.every((k) => cellFormats?.[id]?.[k]?.bold))
-              : ctxMenu.cols.every((k) => (display.bold ?? []).includes(k));
+            const everyCell = (pred: (f: CellFormat | undefined) => boolean) =>
+              ctxMenu.rowIds.length > 0 && ctxMenu.rowIds.every((id) => ctxMenu.cols.every((k) => pred(cellFormats?.[id]?.[k])));
+            const allBold = perCell ? everyCell((f) => !!f?.bold) : ctxMenu.cols.every((k) => (display.bold ?? []).includes(k));
+            const allItalic = everyCell((f) => !!f?.italic);
+            const allUnder = everyCell((f) => !!f?.underline);
+            // общий размер в px, если у всех клеток он одинаков — иначе пусто
+            let commonPx = '';
+            if (perCell && ctxMenu.rowIds.length) {
+              const vals = new Set<number | undefined>();
+              for (const id of ctxMenu.rowIds) for (const k of ctxMenu.cols) vals.add(cellFormats?.[id]?.[k]?.fontPx);
+              if (vals.size === 1) { const v = [...vals][0]; commonPx = v ? String(v) : ''; }
+            }
             const setBold = () => { if (perCell) onCellFormat!(ctxMenu.rowIds, ctxMenu.cols, { bold: !allBold }); else applyBold(ctxMenu.cols); setCtxMenu(null); };
-            const setFont = (mult: number) => { if (perCell) onCellFormat!(ctxMenu.rowIds, ctxMenu.cols, { fontScale: mult }); else applyFontScale(ctxMenu.cols, mult); setCtxMenu(null); };
+            const setItalic = () => { if (perCell) onCellFormat!(ctxMenu.rowIds, ctxMenu.cols, { italic: !allItalic }); setCtxMenu(null); };
+            const setUnder = () => { if (perCell) onCellFormat!(ctxMenu.rowIds, ctxMenu.cols, { underline: !allUnder }); setCtxMenu(null); };
             return (
               <>
                 <button type="button" className={cx(styles.ctxItem, allBold && styles.ctxItemOn)} onClick={setBold}>
-                  {S.menuBold}{allBold ? ' ✓' : ''}
+                  <b>{S.menuBold}</b>{allBold ? ' ✓' : ''}
                 </button>
+                {perCell && (
+                  <>
+                    <button type="button" className={cx(styles.ctxItem, allItalic && styles.ctxItemOn)} onClick={setItalic}>
+                      <i>{S.menuItalic}</i>{allItalic ? ' ✓' : ''}
+                    </button>
+                    <button type="button" className={cx(styles.ctxItem, allUnder && styles.ctxItemOn)} onClick={setUnder}>
+                      <u>{S.menuUnderline}</u>{allUnder ? ' ✓' : ''}
+                    </button>
+                  </>
+                )}
                 <div className={styles.ctxHead}>{S.menuFontHead}</div>
-                <div className={styles.ctxFont}>
-                  <button type="button" className={styles.ctxFontBtn} onClick={() => setFont(0.85)}>{S.menuFontSmall}</button>
-                  <button type="button" className={styles.ctxFontBtn} onClick={() => setFont(1)}>{S.menuFontNormal}</button>
-                  <button type="button" className={styles.ctxFontBtn} onClick={() => setFont(1.15)}>{S.menuFontLarge}</button>
-                </div>
+                {perCell ? (
+                  <div className={styles.ctxFont}>
+                    <select
+                      className={styles.ctxFontSel}
+                      value={commonPx}
+                      onChange={(e) => { const v = e.target.value; onCellFormat!(ctxMenu.rowIds, ctxMenu.cols, { fontPx: v ? Number(v) : 0 }); setCtxMenu(null); }}
+                    >
+                      <option value="">{S.menuFontDefault}</option>
+                      {[10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32].map((px) => (
+                        <option key={px} value={px}>{px} px</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className={styles.ctxFont}>
+                    <button type="button" className={styles.ctxFontBtn} onClick={() => { applyFontScale(ctxMenu.cols, 0.85); setCtxMenu(null); }}>{S.menuFontSmall}</button>
+                    <button type="button" className={styles.ctxFontBtn} onClick={() => { applyFontScale(ctxMenu.cols, 1); setCtxMenu(null); }}>{S.menuFontNormal}</button>
+                    <button type="button" className={styles.ctxFontBtn} onClick={() => { applyFontScale(ctxMenu.cols, 1.15); setCtxMenu(null); }}>{S.menuFontLarge}</button>
+                  </div>
+                )}
               </>
             );
           })()}
@@ -2294,7 +2332,10 @@ export default function MindSheet({
           if (colFs) cellStyle.fontSize = `${colFs}em`;
           const cf = cellFormats?.[String(r.id)]?.[c.key];
           if (cf?.bold) cellStyle.fontWeight = 700;
-          if (cf?.fontScale) cellStyle.fontSize = `${cf.fontScale}em`;
+          if (cf?.italic) cellStyle.fontStyle = 'italic';
+          if (cf?.underline) cellStyle.textDecoration = 'underline';
+          if (cf?.fontPx) cellStyle.fontSize = `${cf.fontPx}px`;
+          else if (cf?.fontScale) cellStyle.fontSize = `${cf.fontScale}em`;
           if (selected && selRect) {
             // синий диапазон с рамкой по краям прямоугольника — как в Google Таблицах
             const edges: string[] = [];

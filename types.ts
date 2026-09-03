@@ -37,10 +37,15 @@ export interface Row {
   [field: string]: Cell;
 }
 
-/** Формат одной клетки. bold — жирный; fontScale — множитель размера шрифта
-    (undefined/1 = обычный). Хранится в данных строки, не в настройках вида. */
+/** Формат одной клетки. Хранится в данных строки, не в настройках вида.
+    bold/italic/underline — начертание; fontPx — размер шрифта в пикселях
+    (undefined = обычный). fontScale — устаревший множитель (для колоночного
+    запасного пути); fontPx имеет приоритет. */
 export interface CellFormat {
   bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  fontPx?: number;
   fontScale?: number;
 }
 
@@ -304,6 +309,9 @@ export interface MindSheetStrings {
   menuFontLarge: string;
   menuFill: string;
   menuClear: string;
+  menuItalic: string;
+  menuUnderline: string;
+  menuFontDefault: string;
   colMenuAria: (label: string) => string;
   rename: string;
   typeHead: string;
