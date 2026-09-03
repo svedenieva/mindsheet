@@ -1586,7 +1586,7 @@ export default function MindSheet({
 
   const tableEl = (
     <div className={cx(styles.tableScroll, sizedCols && styles.sized)} ref={tableRef}>
-      <div className={cx(styles.table, editable && styles.compact)} style={gridStyle} role="table">
+      <div className={cx(styles.table, editable && styles.compact, selectable && styles.selMode)} style={gridStyle} role="table">
           <div className={cx(styles.tableHead, freezeClass)} style={freezeVars} role="row">
             {canReorderRows && <div className={styles.caretCell} aria-hidden="true" />}
             <div className={styles.caretCell} aria-hidden="true" />
@@ -2252,7 +2252,7 @@ export default function MindSheet({
               // starting an edit (or clicking a tag/select option while editing)
               // also opens the record page and throws the editor away
               ref={editingThis ? editingCellRef : undefined}
-              onPointerDown={selectable && !editingThis ? (e) => { if (e.button === 0) cellDown(index, i, e.shiftKey); } : undefined}
+              onPointerDown={selectable && !editingThis ? (e) => { if (e.button === 0) { e.preventDefault(); cellDown(index, i, e.shiftKey); } } : undefined}
               onPointerEnter={selectable && !editingThis ? () => cellEnter(index, i) : undefined}
               onContextMenu={selectable ? (e) => { e.preventDefault(); e.stopPropagation(); openCtx(index, i, e.clientX, e.clientY, r); } : undefined}
               // Google-режим (selectable): одиночный клик только ВЫДЕЛЯЕТ клетку
