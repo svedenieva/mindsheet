@@ -254,7 +254,7 @@ export default function MindSheet({
   editable, onCellEdit, onAddRow, onDeleteRow, onRowReorder, autoGroup, sorts, onSortsChange, onSortReset, onSortsSet, groupBy, onGroupBySet,
   favorites, onToggleFavorite, favoritesOnly, onFavoritesOnlyChange,
   recordCard,
-  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnFormat, onColumnsReorder,
+  editableColumns, onColumnAdd, onColumnRename, onColumnRetype, onColumnDelete, onColumnFormat, onColumnsReorder, cellSelection,
   defaultDisplay, forceDisplay, viewKey, strings, accent, toolbarLead,
 }: MindSheetProps) {
   // надписи: переданные хостом поверх русских значений по умолчанию
@@ -713,8 +713,8 @@ export default function MindSheet({
     !!selRect && row >= selRect.r0 && row <= selRect.r1 && col >= selRect.c0 && col <= selRect.c1;
 
   // ── контекстное меню по правому клику (сортировка, жирный, размер шрифта) ──
-  const [ctxMenu, setCtxMenu] = useState<null | { x: number; y: number; cols: string[]; col: string }>(null);
-  const openCtx = (row: number, col: number, x: number, y: number) => {
+  const [ctxMenu, setCtxMenu] = useState<null | { x: number; y: number; cols: string[]; col: string; row: Row | null }>(null);
+  const openCtx = (row: number, col: number, x: number, y: number, rowData: Row | null) => {
     // если клик вне текущего выделения — выделяем эту одну ячейку
     let cols: string[];
     if (inSel(row, col) && selRect) {
@@ -723,7 +723,7 @@ export default function MindSheet({
       setSel({ a: [row, col], b: [row, col] });
       cols = [gridCols[col]?.key].filter(Boolean) as string[];
     }
-    setCtxMenu({ x, y, cols, col: gridCols[col]?.key ?? '' });
+    setCtxMenu({ x, y, cols, col: gridCols[col]?.key ?? '', row: rowData });
   };
   useEffect(() => {
     if (!ctxMenu) return;
@@ -997,14 +997,15 @@ export default function MindSheet({
     for (const r of displayRecords) items.push({ kind: 'row', row: r, path: '' });
   }
 
-  // выделение ячеек — только в плоском виде; при группировке сбрасываем
-  const selectable = !grouped;
+  // выделение ячеек — опт-ин (cellSelection) и только в плоском виде
+  const selectable = Boolean(cellSelection) && !grouped;
   useEffect(() => { if (grouped) setSel(null); }, [grouped]);
   useEffect(() => {
     const up = () => {
       if (!selDragging.current) return;
       selDragging.current = false;
-      if (!selMoved.current) { setSel(null); selSuppressClick.current = false; }
+      // одиночный клик оставляет клетку выделенной (режим Google Таблиц):
+      // синий бокс «залипает», пока не кликнут другую клетку
     };
     window.addEventListener('pointerup', up);
     return () => window.removeEventListener('pointerup', up);
@@ -1964,6 +1965,14 @@ export default function MindSheet({
           // не даём событию закрыть меню раньше, чем отработает пункт
           onPointerDown={(e) => e.stopPropagation()}
         >
+          {rowsClickable && ctxMenu.row && (
+            <>
+              <button type="button" className={styles.ctxItem} onClick={() => { const rr = ctxMenu.row!; setCtxMenu(null); onRowOpen!(rr); }}>
+                {S.openAsPage}
+              </button>
+              <div className={styles.ctxSep} />
+            </>
+          )}
           <button type="button" className={styles.ctxItem} onClick={() => { if (onSortsSet) onSortsSet([{ key: ctxMenu.col, dir: 'asc' }]); else onSortChange(ctxMenu.col); setCtxMenu(null); }}>
             {S.menuSortAsc}
           </button>
@@ -2245,13 +2254,29 @@ export default function MindSheet({
               ref={editingThis ? editingCellRef : undefined}
               onPointerDown={selectable && !editingThis ? (e) => { if (e.button === 0) cellDown(index, i, e.shiftKey); } : undefined}
               onPointerEnter={selectable && !editingThis ? () => cellEnter(index, i) : undefined}
-              onContextMenu={selectable ? (e) => { e.preventDefault(); e.stopPropagation(); openCtx(index, i, e.clientX, e.clientY); } : undefined}
-              onClick={(e) => {
-                // проглатываем клик, оставшийся от drag/Shift-выделения, чтобы он
-                // не запустил правку и не открыл карточку строки
-                if (selSuppressClick.current) { e.stopPropagation(); selSuppressClick.current = false; return; }
-                if (editable) { e.stopPropagation(); if (!editingThis) startEdit(r, c.key); }
-              }}
+              onContextMenu={selectable ? (e) => { e.preventDefault(); e.stopPropagation(); openCtx(index, i, e.clientX, e.clientY, r); } : undefined}
+              // Google-режим (selectable): одиночный клик только ВЫДЕЛЯЕТ клетку
+              // (это делает pointerDown), поэтому гасим всплытие — правка двойным
+              // кликом, открытие страницы стрелкой «›»/меню. Без этого режима —
+              // прежнее поведение хоста: editable → клик правит, иначе клик по
+              // ячейке всплывает к строке и открывает её.
+              onClick={
+                selectable
+                  ? (e) => { e.stopPropagation(); selSuppressClick.current = false; }
+                  : editable
+                    ? (e) => { e.stopPropagation(); if (!editingThis) startEdit(r, c.key); }
+                    : undefined
+              }
+              onDoubleClick={
+                selectable
+                  ? (e) => {
+                      e.stopPropagation();
+                      if (editingThis) return;
+                      if (editable) startEdit(r, c.key);
+                      else if (rowsClickable) onRowOpen!(r);
+                    }
+                  : undefined
+              }
               // keep editor keystrokes (Enter to commit, Space in a tag) from
               // bubbling to the row, whose Enter/Space opens the record page
               onKeyDown={editable ? (e) => e.stopPropagation() : undefined}

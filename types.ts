@@ -169,6 +169,12 @@ export interface MindSheetProps {
   onColumnDelete?: (key: string) => void;
   /** сменить формат отображения числовой колонки */
   onColumnFormat?: (key: string, format: NumberFormat) => void;
+
+  /** Режим Google Таблиц для мыши: одиночный клик ВЫДЕЛЯЕТ клетку (синий бокс),
+      перетаскивание/Shift-клик — диапазон, правый клик — контекстное меню,
+      двойной клик — правка (или открытие страницы, если не editable). Опт-ин:
+      хост Fathom его не включает и работает как раньше (клик = открыть строку). */
+  cellSelection?: boolean;
   /** новый порядок колонок (полный список ключей грид-колонок) */
   onColumnsReorder?: (keys: string[]) => void;
 
